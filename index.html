@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pantau Titik Panas — PT PSAM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+:root, html[data-theme="dark"]{
+  --bg-deep:#05070a;
+  --panel:rgba(13,15,20,0.62);
+  --panel-2:rgba(20,22,28,0.7);
+  --line:rgba(255,255,255,0.09);
+  --text:#edf0f6;
+  --text-dim:#9aa3b8;
+  --text-faint:#6b7488;
+  --ember:#ff6a3d;
+  --ember-bright:#ffa168;
+  --ember-dim:#a8431f;
+  --gold:#e0b24f;
+  --low:#5b8fd9;
+  --nominal:#f2b134;
+  --high:#ef4444;
+  --good:#4fbf8f;
+  --tile-filter:saturate(0.85) brightness(0.92);
+  --radius:14px;
+  --radius-pill:999px;
+}
+html[data-theme="light"]{
+  --bg-deep:#eef1ea;
+  --panel:rgba(255,255,255,0.72);
+  --panel-2:rgba(255,255,255,0.85);
+  --line:rgba(20,20,15,0.12);
+  --text:#1c1e18;
+  --text-dim:#5b5f52;
+  --text-faint:#83876f;
+  --ember:#d9491f;
+  --ember-bright:#b8391a;
+  --ember-dim:#f0a480;
+  --gold:#9c7418;
+  --low:#2f6fc2;
+  --nominal:#b5810a;
+  --high:#c92f2f;
+  --good:#28885f;
+  --tile-filter:none;
+}
+*{box-sizing:border-box;}
+html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:var(--bg-deep); color:var(--text);
+  font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; transition:background .2s ease, color .2s ease;}
+#map{position:fixed; inset:0; z-index:1; background:#0a0c10;}
+.leaflet-tile-pane{filter:var(--tile-filter);}
+
+/* ---------- floating capsule header ---------- */
+.hdr{
+  position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:40;
+  display:flex; align-items:center; gap:14px;
+  background:var(--panel); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line); border-radius:var(--radius-pill);
+  padding:9px 10px 9px 18px; box-shadow:0 16px 44px rgba(0,0,0,.45);
+  max-width:min(94vw, 620px);
+}
+.hdr .dot{width:8px; height:8px; border-radius:50%; background:var(--ember); flex:none; box-shadow:0 0 10px var(--ember);
+  animation:pulse 1.8s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+.hdr h1{font-size:15px; font-weight:800; margin:0; white-space:nowrap; letter-spacing:-.01em;}
+.hdr .sub{font-size:10.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.hdr .htxt{min-width:0;}
+.hdr-btn{
+  width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--panel-2);
+  color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
+  font-size:15px; transition:border-color .15s, background .15s, transform .15s;
+}
+.hdr-btn:hover{border-color:var(--ember-dim); background:#1c1712;}
+.hdr-btn.spinning svg{animation:spin 0.9s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.theme-toggle{position:relative; overflow:hidden;}
+.theme-toggle svg{position:absolute; width:15px; height:15px; transition:transform .3s ease, opacity .3s ease;}
+.theme-toggle .ic-sun{opacity:0; transform:translateY(8px) rotate(-40deg);}
+.theme-toggle .ic-moon{opacity:1; transform:translateY(0) rotate(0);}
+html[data-theme="light"] .theme-toggle .ic-sun{opacity:1; transform:translateY(0) rotate(0);}
+html[data-theme="light"] .theme-toggle .ic-moon{opacity:0; transform:translateY(-8px) rotate(40deg);}
+
+.status-banner{
+  display:none; align-items:flex-start; gap:9px; padding:10px 11px; border-radius:10px; margin-bottom:14px;
+  font-size:11.5px; line-height:1.5; border:1px solid rgba(239,68,68,0.35); background:rgba(239,68,68,0.1); color:#ffd3ce;
+}
+.status-banner.show{display:flex;}
+.status-banner.info{border-color:rgba(91,143,217,0.4); background:rgba(91,143,217,0.1); color:#cfe0f7;}
+.status-banner b{display:block; margin-bottom:2px; color:inherit;}
+.status-banner .retry-link{color:inherit; text-decoration:underline; cursor:pointer; font-weight:700;}
+
+/* ---------- side panel ---------- */
+.panel{
+  position:fixed; top:74px; left:14px; bottom:14px; z-index:35; width:340px; max-width:88vw;
+  background:var(--panel); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+  border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 20px 54px rgba(0,0,0,.5);
+  display:flex; flex-direction:column; overflow:hidden; transition:transform .22s ease, opacity .22s ease;
+}
+.panel.hidden{transform:translateX(calc(-100% - 24px)); opacity:0; pointer-events:none;}
+.panel-scroll{overflow-y:auto; padding:16px 16px 20px; flex:1;}
+.panel-scroll::-webkit-scrollbar{width:6px;}
+.panel-scroll::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px;}
+.p-eyebrow{font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.14em; color:var(--ember-bright);
+  text-transform:uppercase; margin:0 0 4px;}
+.p-title{font-size:13px; font-weight:700; margin:0 0 10px; color:var(--text);}
+.field-row{display:flex; gap:8px; margin-bottom:10px;}
+.field{flex:1; min-width:0;}
+.field label{display:block; font-size:10px; color:var(--text-dim); margin-bottom:5px; letter-spacing:.02em;}
+select, input[type=text], input[type=password]{
+  width:100%; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text);
+  background:rgba(255,255,255,0.04); border:1px solid var(--line); border-radius:8px;
+  padding:8px 9px; outline:none;
+}
+select:focus, input:focus{border-color:var(--ember-dim);}
+select option{background:#14161c; color:var(--text);}
+.block{margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.06);}
+.block:last-of-type{border-bottom:none;}
+.btn{
+  font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700; padding:9px 14px;
+  border-radius:10px; border:1px solid var(--line); background:var(--panel-2); color:var(--text);
+  cursor:pointer; transition:border-color .15s, background .15s, transform .1s; width:100%;
+}
+.btn:hover{border-color:var(--ember-dim); background:#1c1712;}
+.btn:active{transform:translateY(1px);}
+.btn.primary{background:linear-gradient(135deg, var(--ember-dim), var(--ember)); color:#1c0900; border:none;}
+.btn.primary:hover{filter:brightness(1.08);}
+.btn.ghost{background:transparent;}
+.hint{font-size:10.5px; color:var(--text-faint); line-height:1.5; margin:8px 0 0;}
+.hint a{color:var(--gold); text-decoration:none; border-bottom:1px dotted var(--gold);}
+
+.stat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:4px;}
+.stat{background:rgba(255,255,255,0.04); border:1px solid var(--line); border-radius:10px; padding:9px 8px; text-align:center;}
+.stat .n{font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700;}
+.stat .l{font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-top:2px;}
+.stat.low .n{color:var(--low);} .stat.nominal .n{color:var(--nominal);} .stat.high .n{color:var(--high);}
+
+.legend-row{display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-dim); margin-top:6px;}
+.legend-row .sw{width:10px; height:10px; border-radius:50%; flex:none;}
+
+.list-item{
+  display:flex; gap:10px; align-items:flex-start; padding:9px 8px; border-radius:9px; cursor:pointer;
+  border:1px solid transparent;
+}
+.list-item:hover{background:rgba(255,255,255,0.045); border-color:var(--line);}
+.list-item .sw{width:9px; height:9px; border-radius:50%; margin-top:4px; flex:none;}
+.list-item .li-main{flex:1; min-width:0;}
+.list-item .li-loc{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--text);}
+.list-item .li-meta{font-size:10px; color:var(--text-faint); margin-top:2px;}
+.empty-note{font-size:11.5px; color:var(--text-dim); text-align:center; padding:22px 8px; line-height:1.6;}
+.source-note{font-size:10px; color:var(--text-faint); line-height:1.55; margin-top:10px;}
+.source-note b{color:var(--text-dim);}
+
+/* ---------- panel reopen tab ---------- */
+.panel-open-tab{
+  position:fixed; top:74px; left:14px; z-index:34; width:38px; height:38px; border-radius:12px;
+  background:var(--panel); border:1px solid var(--line); backdrop-filter:blur(14px);
+  display:none; align-items:center; justify-content:center; cursor:pointer; font-size:16px;
+  box-shadow:0 12px 30px rgba(0,0,0,.4);
+}
+.panel-open-tab.show{display:flex;}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(20px); z-index:60;
+  background:#171512; border:1px solid var(--line); color:var(--text); font-size:12.5px; font-weight:600;
+  padding:10px 18px; border-radius:var(--radius-pill); box-shadow:0 14px 40px rgba(0,0,0,.5);
+  opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+.toast.err{border-color:rgba(239,68,68,0.5); color:#ffd3ce;}
+
+.leaflet-popup-content-wrapper{background:#14161c; color:var(--text); border-radius:12px; box-shadow:0 14px 36px rgba(0,0,0,.5);}
+.leaflet-popup-tip{background:#14161c;}
+.pop-title{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12.5px; margin-bottom:4px;}
+.pop-row{font-size:11.5px; color:#b7bfd0; margin:2px 0;}
+.pop-row b{color:var(--text);}
+
+@media (max-width:640px){
+  .panel{ top:auto; bottom:0; left:0; right:0; width:100%; max-width:100%; height:70vh; border-radius:16px 16px 0 0; }
+  .panel.hidden{ transform:translateY(calc(100% + 24px)); }
+  .hdr{ max-width:94vw; }
+  .hdr .sub{ display:none; }
+}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<header class="hdr">
+  <span class="dot"></span>
+  <div class="htxt">
+    <h1>Pantau Titik Panas</h1>
+    <div class="sub" id="hdrSub">Belum dimuat — atur MAP_KEY di panel</div>
+  </div>
+  <button class="hdr-btn" id="refreshBtn" title="Muat ulang data" aria-label="Muat ulang data">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v6h-6"/></svg>
+  </button>
+  <button class="hdr-btn theme-toggle" id="themeToggleBtn" title="Ganti tema" aria-label="Ganti tema terang/gelap">
+    <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></svg>
+    <svg class="ic-moon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M15 3a9 9 0 1 0 6 15.5A9.5 9.5 0 0 1 15 3Z"/></svg>
+  </button>
+  <button class="hdr-btn" id="panelToggleBtn" title="Panel kontrol" aria-label="Panel kontrol">☰</button>
+</header>
+
+<div class="panel-open-tab" id="panelOpenTab" title="Buka panel">☰</div>
+
+<aside class="panel" id="panel">
+  <div class="panel-scroll">
+    <div class="status-banner" id="statusBanner"></div>
+    <div class="block">
+      <p class="p-eyebrow">Sumber Data</p>
+      <p class="p-title">NASA FIRMS — MAP_KEY</p>
+      <div class="field" style="margin-bottom:8px;">
+        <label for="mapKeyInput">Kunci API gratis FIRMS</label>
+        <input type="password" id="mapKeyInput" placeholder="tempel MAP_KEY di sini" autocomplete="off">
+      </div>
+      <button class="btn primary" id="saveKeyBtn">Simpan &amp; Muat Data</button>
+      <button class="btn ghost" id="demoBtn" style="margin-top:8px;">Coba data contoh (offline)</button>
+      <p class="hint">Belum punya kunci? Daftar gratis di <a href="https://firms.modaps.eosdis.nasa.gov/api/map_key/" target="_blank" rel="noopener">firms.modaps.eosdis.nasa.gov/api/map_key</a> — kunci disimpan hanya di peramban perangkat ini.</p>
+    </div>
+
+    <div class="block">
+      <p class="p-eyebrow">Cakupan &amp; Periode</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="regionSelect">Wilayah</label>
+          <select id="regionSelect">
+            <option value="kalteng" selected>Kalimantan Tengah</option>
+            <option value="kalimantan">Kalimantan (semua)</option>
+            <option value="sumatera">Sumatera</option>
+            <option value="indonesia">Indonesia (nasional)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="rangeSelect">Periode</label>
+          <select id="rangeSelect">
+            <option value="1" selected>24 jam</option>
+            <option value="2">48 jam</option>
+            <option value="3">3 hari</option>
+            <option value="7">7 hari</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="sourceSelect">Satelit / sensor</label>
+        <select id="sourceSelect">
+          <option value="VIIRS_SNPP_NRT" selected>VIIRS Suomi-NPP (375 m)</option>
+          <option value="VIIRS_NOAA20_NRT">VIIRS NOAA-20 (375 m)</option>
+          <option value="MODIS_NRT">MODIS Terra/Aqua (1 km)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="block">
+      <p class="p-eyebrow">Ringkasan</p>
+      <div class="stat-grid">
+        <div class="stat low"><div class="n" id="statLow">–</div><div class="l">Rendah</div></div>
+        <div class="stat nominal"><div class="n" id="statNominal">–</div><div class="l">Sedang</div></div>
+        <div class="stat high"><div class="n" id="statHigh">–</div><div class="l">Tinggi</div></div>
+      </div>
+      <div class="legend-row"><span class="sw" style="background:var(--low)"></span> Keyakinan rendah</div>
+      <div class="legend-row"><span class="sw" style="background:var(--nominal)"></span> Keyakinan sedang</div>
+      <div class="legend-row"><span class="sw" style="background:var(--high)"></span> Keyakinan tinggi</div>
+    </div>
+
+    <div class="block">
+      <p class="p-eyebrow">Titik Terdeteksi</p>
+      <div id="hotspotList"><div class="empty-note">Belum ada data. Masukkan MAP_KEY lalu tekan "Simpan &amp; Muat Data".</div></div>
+    </div>
+
+    <a class="btn ghost" style="display:block; text-align:center; text-decoration:none;" href="https://sipongi.gakkum.kehutanan.go.id/sebaran-titik-panas" target="_blank" rel="noopener">↗ Buka data resmi SIPONGI KLHK</a>
+    <p class="source-note">Halaman ini memuat data hotspot langsung dari <b>NASA FIRMS</b> (VIIRS/MODIS) — sumber satelit yang sama dipakai SIPONGI KLHK. SIPONGI sendiri tidak menyediakan API publik untuk disematkan, sehingga verifikasi resmi tetap merujuk ke tautan di atas. Setiap penggunaan ulang data wajib mencantumkan sumber sesuai ketentuan masing-masing penyedia.</p>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  // ---------- REGION PRESETS (west,south,east,north) ----------
+  const REGIONS = {
+    kalteng:    { bbox:'110.5,-4.2,114.8,0.6', center:[-1.9,112.6], zoom:7,  label:'Kalimantan Tengah' },
+    kalimantan: { bbox:'108.5,-4.5,119.5,4.5', center:[-1.0,114.0], zoom:6,  label:'Kalimantan' },
+    sumatera:   { bbox:'94.5,-6.2,106.5,6.2',  center:[-0.5,101.5], zoom:5,  label:'Sumatera' },
+    indonesia:  { bbox:'94,-11.5,141.5,6.5',   center:[-2.5,117.5], zoom:5,  label:'Indonesia' }
+  };
+  const SOURCE_LABELS = {
+    VIIRS_SNPP_NRT:'VIIRS Suomi-NPP', VIIRS_NOAA20_NRT:'VIIRS NOAA-20', MODIS_NRT:'MODIS Terra/Aqua'
+  };
+
+  // ---------- THEME ----------
+  const THEME_KEY = 'psam_hotspot_theme';
+  let tileLayer = null;
+  function buildTileLayer(theme){
+    const url = theme === 'light'
+      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    return L.tileLayer(url, { attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18, subdomains:'abcd' });
+  }
+  function applyTheme(t){
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem(THEME_KEY, t);
+    if(tileLayer) map.removeLayer(tileLayer);
+    tileLayer = buildTileLayer(t).addTo(map);
+  }
+
+  // ---------- MAP ----------
+  const map = L.map('map', { zoomControl:false, attributionControl:true }).setView(REGIONS.kalteng.center, REGIONS.kalteng.zoom);
+  L.control.zoom({ position:'bottomright' }).addTo(map);
+  applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+
+  const clusterGroup = L.markerClusterGroup({
+    maxClusterRadius:44,
+    iconCreateFunction: function(cluster){
+      const n = cluster.getChildCount();
+      let cls = 'low';
+      cluster.getAllChildMarkers().forEach(m=>{ if(m.options.confClass==='high') cls='high'; else if(m.options.confClass==='nominal' && cls!=='high') cls='nominal'; });
+      const color = cls==='high' ? '#ef4444' : cls==='nominal' ? '#f2b134' : '#5b8fd9';
+      return L.divIcon({
+        html:`<div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+              background:${color}33;border:2px solid ${color};color:#fff;font-family:JetBrains Mono,monospace;font-weight:700;font-size:12px;">${n}</div>`,
+        className:'', iconSize:[38,38]
+      });
+    }
+  });
+  map.addLayer(clusterGroup);
+
+  // ---------- DOM ----------
+  const hdrSub = document.getElementById('hdrSub');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const panel = document.getElementById('panel');
+  const panelToggleBtn = document.getElementById('panelToggleBtn');
+  const panelOpenTab = document.getElementById('panelOpenTab');
+  const mapKeyInput = document.getElementById('mapKeyInput');
+  const saveKeyBtn = document.getElementById('saveKeyBtn');
+  const regionSelect = document.getElementById('regionSelect');
+  const rangeSelect = document.getElementById('rangeSelect');
+  const sourceSelect = document.getElementById('sourceSelect');
+  const statLow = document.getElementById('statLow');
+  const statNominal = document.getElementById('statNominal');
+  const statHigh = document.getElementById('statHigh');
+  const hotspotList = document.getElementById('hotspotList');
+  const toast = document.getElementById('toast');
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const statusBanner = document.getElementById('statusBanner');
+  const demoBtn = document.getElementById('demoBtn');
+
+  themeToggleBtn.addEventListener('click', ()=>{
+    const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
+  });
+
+  // ---------- STORAGE ----------
+  const LS_KEY = 'psam_firms_map_key';
+  const savedKey = localStorage.getItem(LS_KEY);
+  if(savedKey) mapKeyInput.value = savedKey;
+
+  // ---------- UI helpers ----------
+  let toastTimer = null;
+  function showToast(msg, isErr){
+    toast.textContent = msg;
+    toast.className = 'toast show' + (isErr ? ' err' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>{ toast.className = 'toast'; }, 4200);
+  }
+  function showStatus(html, kind){
+    statusBanner.innerHTML = html;
+    statusBanner.className = 'status-banner show' + (kind==='info' ? ' info' : '');
+  }
+  function clearStatus(){
+    statusBanner.className = 'status-banner';
+    statusBanner.innerHTML = '';
+  }
+  panelToggleBtn.addEventListener('click', ()=>{
+    panel.classList.add('hidden');
+    panelOpenTab.classList.add('show');
+  });
+  panelOpenTab.addEventListener('click', ()=>{
+    panel.classList.remove('hidden');
+    panelOpenTab.classList.remove('show');
+  });
+
+  function setSpinning(on){
+    refreshBtn.classList.toggle('spinning', !!on);
+  }
+
+  // ---------- CSV parsing ----------
+  function parseCSV(text){
+    const lines = text.trim().split('\n');
+    if(lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h=>h.trim());
+    const rows = [];
+    for(let i=1;i<lines.length;i++){
+      if(!lines[i]) continue;
+      const cols = lines[i].split(',');
+      const row = {};
+      headers.forEach((h,idx)=>{ row[h] = cols[idx] !== undefined ? cols[idx].trim() : ''; });
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function confBucket(row, source){
+    if(source.indexOf('VIIRS') === 0){
+      const c = (row.confidence || '').toLowerCase();
+      if(c === 'h') return 'high';
+      if(c === 'n') return 'nominal';
+      return 'low';
+    }
+    const c = parseFloat(row.confidence);
+    if(isNaN(c)) return 'nominal';
+    if(c >= 80) return 'high';
+    if(c >= 30) return 'nominal';
+    return 'low';
+  }
+
+  function fmtDateTime(acqDate, acqTime){
+    // acqDate: YYYY-MM-DD, acqTime: HHMM (UTC)
+    const t = (acqTime || '0000').padStart(4,'0');
+    const hh = t.slice(0,2), mm = t.slice(2,4);
+    const utc = new Date(`${acqDate}T${hh}:${mm}:00Z`);
+    const wib = new Date(utc.getTime() + 7*3600*1000);
+    const pad = n => String(n).padStart(2,'0');
+    return {
+      utcLabel: `${acqDate} ${hh}:${mm} UTC`,
+      wibLabel: `${pad(wib.getUTCDate())}-${pad(wib.getUTCMonth()+1)}-${wib.getUTCFullYear()} ${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())} WIB`
+    };
+  }
+
+  // ---------- fetch & render ----------
+  let currentMarkers = [];
+
+  // FIRMS' area/csv endpoint tidak selalu mengirim header CORS ke pemanggil dari
+  // browser pihak ketiga — kalau permintaan langsung gagal/diblokir, coba lagi
+  // lewat proxy CORS publik sebagai cadangan, baru dianggap gagal total.
+  async function fetchCsvRobust(directUrl){
+    const attempts = [
+      { label:'langsung', get: ()=> fetch(directUrl).then(r=>r.text().then(t=>({ok:r.ok, status:r.status, text:t}))) },
+      { label:'proxy cadangan 1', get: ()=> fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl)).then(r=>r.text().then(t=>({ok:r.ok, status:r.status, text:t}))) },
+      { label:'proxy cadangan 2', get: ()=> fetch('https://corsproxy.io/?url=' + encodeURIComponent(directUrl)).then(r=>r.text().then(t=>({ok:r.ok, status:r.status, text:t}))) }
+    ];
+    let lastErr = null;
+    for(const attempt of attempts){
+      try{
+        const { ok, status, text } = await attempt.get();
+        const head = text.slice(0,160);
+        if(!ok || /invalid map_key/i.test(head) || /<html/i.test(head) || /^error/i.test(head.trim())){
+          throw new Error(head || ('HTTP ' + status));
+        }
+        return { text, via: attempt.label };
+      } catch(e){
+        lastErr = e;
+      }
+    }
+    throw lastErr || new Error('Semua percobaan pengambilan data gagal');
+  }
+
+  async function loadHotspots(){
+    const key = mapKeyInput.value.trim();
+    if(!key){
+      showToast('Masukkan MAP_KEY FIRMS terlebih dahulu', true);
+      showStatus('<b>Belum ada MAP_KEY.</b> Tempel kunci FIRMS di kolom di atas lalu klik "Simpan &amp; Muat Data".', 'info');
+      return;
+    }
+    clearStatus();
+    const region = REGIONS[regionSelect.value];
+    const source = sourceSelect.value;
+    const dayRange = rangeSelect.value;
+    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${key}/${source}/${region.bbox}/${dayRange}`;
+
+    setSpinning(true);
+    hdrSub.textContent = `Memuat ${region.label} — ${SOURCE_LABELS[source]}…`;
+    try{
+      const { text, via } = await fetchCsvRobust(url);
+      const rows = parseCSV(text);
+      renderHotspots(rows, source, region);
+      localStorage.setItem(LS_KEY, key);
+      const now = new Date();
+      const pad = n => String(n).padStart(2,'0');
+      hdrSub.textContent = `${region.label} · ${rows.length} titik · diperbarui ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      if(rows.length === 0){
+        showStatus('<b>0 titik panas terdeteksi.</b> Ini bisa berarti wilayah/periode terpilih memang bersih, atau MAP_KEY belum aktif (kunci baru butuh beberapa menit untuk aktif setelah didaftarkan). Coba perbesar periode ke "7 hari" atau wilayah "Kalimantan (semua)" untuk memastikan.', 'info');
+      } else {
+        showToast(`${rows.length} titik panas dimuat (via ${via})`);
+      }
+    } catch(err){
+      hdrSub.textContent = 'Gagal memuat data — periksa MAP_KEY / koneksi';
+      const msg = (err && err.message) ? err.message : 'periksa MAP_KEY & koneksi internet';
+      showToast('Gagal memuat data FIRMS', true);
+      showStatus(`<b>Gagal memuat data.</b> Pesan: <code>${msg.replace(/</g,'&lt;')}</code><br>
+        Kemungkinan penyebab: MAP_KEY salah/belum aktif, kuota 5000 permintaan/10 menit terlampai, atau permintaan diblokir CORS oleh peramban (sistem sudah otomatis mencoba proxy cadangan).
+        <br><span class="retry-link" id="retryLink">Coba lagi</span> · atau pakai <span class="retry-link" id="demoLinkInline">data contoh</span> untuk memastikan peta &amp; tampilan berfungsi normal.`, null);
+      const retryEl = document.getElementById('retryLink');
+      if(retryEl) retryEl.addEventListener('click', loadHotspots);
+      const demoEl = document.getElementById('demoLinkInline');
+      if(demoEl) demoEl.addEventListener('click', loadDemoData);
+    } finally {
+      setSpinning(false);
+    }
+  }
+
+  // ---------- demo/offline sample so the UI can be verified without a live key ----------
+  function loadDemoData(){
+    clearStatus();
+    const region = REGIONS[regionSelect.value] || REGIONS.kalteng;
+    const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    const acqDate = `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())}`;
+    const [w,s,e,n] = region.bbox.split(',').map(Number);
+    const rnd = (min,max)=> Math.random()*(max-min)+min;
+    const confs = ['l','n','h'];
+    const rows = Array.from({length: 24}).map((_,i)=>({
+      latitude: rnd(s,n).toFixed(4),
+      longitude: rnd(w,e).toFixed(4),
+      confidence: confs[Math.floor(Math.random()*confs.length)],
+      satellite: 'DEMO',
+      acq_date: acqDate,
+      acq_time: String(Math.floor(rnd(0,23))).padStart(2,'0') + String(Math.floor(rnd(0,59))).padStart(2,'0'),
+      frp: rnd(1,60).toFixed(1)
+    }));
+    renderHotspots(rows, 'VIIRS_SNPP_NRT', region);
+    hdrSub.textContent = `${region.label} · ${rows.length} titik contoh (data demo, bukan data satelit nyata)`;
+    showStatus('<b>Menampilkan data contoh (bukan data satelit nyata).</b> Gunakan ini hanya untuk memastikan peta &amp; panel berfungsi normal — sambungkan MAP_KEY yang valid untuk data hotspot sesungguhnya.', 'info');
+    showToast('Data contoh dimuat (offline)');
+  }
+  demoBtn.addEventListener('click', loadDemoData);
+
+  function renderHotspots(rows, source, region){
+    clusterGroup.clearLayers();
+    currentMarkers = [];
+    let low=0, nominal=0, high=0;
+
+    rows.forEach(row=>{
+      const lat = parseFloat(row.latitude), lon = parseFloat(row.longitude);
+      if(isNaN(lat) || isNaN(lon)) return;
+      const bucket = confBucket(row, source);
+      if(bucket==='low') low++; else if(bucket==='nominal') nominal++; else high++;
+      const color = bucket==='high' ? '#ef4444' : bucket==='nominal' ? '#f2b134' : '#5b8fd9';
+      const frp = parseFloat(row.frp);
+      const dt = fmtDateTime(row.acq_date, row.acq_time);
+
+      const marker = L.circleMarker([lat, lon], {
+        radius: bucket==='high' ? 7 : bucket==='nominal' ? 6 : 5,
+        color, weight:1.5, fillColor:color, fillOpacity:0.55,
+        confClass: bucket
+      });
+      marker.bindPopup(
+        `<div class="pop-title">🔥 ${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
+         <div class="pop-row"><b>Keyakinan:</b> ${bucket==='high'?'Tinggi':bucket==='nominal'?'Sedang':'Rendah'}</div>
+         <div class="pop-row"><b>Satelit:</b> ${row.satellite || SOURCE_LABELS[source]}</div>
+         ${isNaN(frp) ? '' : `<div class="pop-row"><b>Daya radiasi api (FRP):</b> ${frp.toFixed(1)} MW</div>`}
+         <div class="pop-row"><b>Waktu deteksi:</b> ${dt.wibLabel}</div>
+         <div class="pop-row" style="color:#7a8296;">${dt.utcLabel}</div>`
+      );
+      clusterGroup.addLayer(marker);
+      currentMarkers.push({ marker, lat, lon, bucket, dt, row });
+    });
+
+    statLow.textContent = low;
+    statNominal.textContent = nominal;
+    statHigh.textContent = high;
+
+    // list, most-confident & most-recent first
+    currentMarkers.sort((a,b)=>{
+      const order = { high:0, nominal:1, low:2 };
+      if(order[a.bucket] !== order[b.bucket]) return order[a.bucket]-order[b.bucket];
+      return (b.row.acq_date+b.row.acq_time).localeCompare(a.row.acq_date+a.row.acq_time);
+    });
+
+    if(currentMarkers.length === 0){
+      hotspotList.innerHTML = '<div class="empty-note">Tidak ada titik panas terdeteksi pada wilayah &amp; periode ini. Kondisi aman untuk saat ini.</div>';
+    } else {
+      const top = currentMarkers.slice(0, 60);
+      hotspotList.innerHTML = top.map(item=>{
+        const color = item.bucket==='high' ? '#ef4444' : item.bucket==='nominal' ? '#f2b134' : '#5b8fd9';
+        return `<div class="list-item" data-lat="${item.lat}" data-lon="${item.lon}">
+          <span class="sw" style="background:${color}"></span>
+          <div class="li-main">
+            <div class="li-loc">${item.lat.toFixed(3)}, ${item.lon.toFixed(3)}</div>
+            <div class="li-meta">${item.dt.wibLabel} · ${item.row.satellite || ''}</div>
+          </div>
+        </div>`;
+      }).join('') + (currentMarkers.length > 60 ? `<div class="hint" style="text-align:center;">+${currentMarkers.length-60} titik lainnya di peta</div>` : '');
+
+      hotspotList.querySelectorAll('.list-item').forEach(el=>{
+        el.addEventListener('click', ()=>{
+          const lat = parseFloat(el.dataset.lat), lon = parseFloat(el.dataset.lon);
+          map.flyTo([lat, lon], 11, { duration:0.6 });
+          const found = currentMarkers.find(m=> m.lat===lat && m.lon===lon);
+          if(found) setTimeout(()=> found.marker.openPopup(), 650);
+        });
+      });
+    }
+
+    if(currentMarkers.length){
+      map.setView(region.center, region.zoom);
+    }
+  }
+
+  // ---------- events ----------
+  saveKeyBtn.addEventListener('click', loadHotspots);
+  refreshBtn.addEventListener('click', loadHotspots);
+  regionSelect.addEventListener('change', ()=>{
+    const region = REGIONS[regionSelect.value];
+    map.setView(region.center, region.zoom);
+    if(mapKeyInput.value.trim()) loadHotspots();
+  });
+  rangeSelect.addEventListener('change', ()=>{ if(mapKeyInput.value.trim()) loadHotspots(); });
+  sourceSelect.addEventListener('change', ()=>{ if(mapKeyInput.value.trim()) loadHotspots(); });
+  mapKeyInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') loadHotspots(); });
+
+  // auto-load if a key was already saved previously
+  if(savedKey){ loadHotspots(); }
+})();
+</script>
+</body>
+</html>

@@ -49,16 +49,16 @@
 }
 html[data-theme="light"]{
   --bg-deep:#e7ebe2;
-  --panel:rgba(255,255,255,0.52);
-  --panel-2:rgba(255,255,255,0.64);
-  --line:rgba(20,20,15,0.16);
-  --text:#191b15;
-  --text-dim:#464a3d;
-  --text-faint:#6b6f5e;
-  --ember:#d9491f;
-  --ember-bright:#b8391a;
+  --panel:rgba(255,255,255,0.74);
+  --panel-2:rgba(255,255,255,0.84);
+  --line:rgba(20,20,15,0.2);
+  --text:#14150f;
+  --text-dim:#3d4033;
+  --text-faint:#4c5041;
+  --ember:#c23e17;
+  --ember-bright:#a03216;
   --ember-dim:#f0a480;
-  --gold:#9c7418;
+  --gold:#7a5610;
   --low:#2f6fc2;
   --nominal:#b5810a;
   --high:#c92f2f;
@@ -242,16 +242,6 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
 .source-note{font-size:10px; color:var(--text-faint); line-height:1.55; margin-top:10px;}
 .source-note b{color:var(--text-dim);}
 
-/* ---------- panel reopen tab ---------- */
-.panel-open-tab{
-  position:fixed; top:74px; left:14px; z-index:34; width:38px; height:38px; border-radius:12px;
-  background:var(--panel); border:1px solid var(--glass-edge);
-  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
-  display:none; align-items:center; justify-content:center; cursor:pointer; font-size:16px;
-  box-shadow:var(--glass-shadow), inset 0 1.5px 0 var(--glass-edge-top);
-}
-.panel-open-tab.show{display:flex;}
-
 /* ---------- toast ---------- */
 .toast{
   position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(20px); z-index:60;
@@ -358,8 +348,6 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
   </button>
   <button class="hdr-btn" id="panelToggleBtn" title="Panel kontrol" aria-label="Panel kontrol">☰</button>
 </header>
-
-<div class="panel-open-tab" id="panelOpenTab" title="Buka panel">☰</div>
 
 <div class="source-box hidden" id="sourceBox">
   <div class="source-box-head" id="sourceBoxHead">
@@ -549,7 +537,6 @@ const KAL_KEC_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
   const refreshBtn = document.getElementById('refreshBtn');
   const panel = document.getElementById('panel');
   const panelToggleBtn = document.getElementById('panelToggleBtn');
-  const panelOpenTab = document.getElementById('panelOpenTab');
   const mapKeyInput = document.getElementById('mapKeyInput');
   const saveKeyBtn = document.getElementById('saveKeyBtn');
   const regionSelect = document.getElementById('regionSelect');
@@ -660,12 +647,7 @@ const KAL_KEC_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
     statusBanner.innerHTML = '';
   }
   panelToggleBtn.addEventListener('click', ()=>{
-    panel.classList.add('hidden');
-    panelOpenTab.classList.add('show');
-  });
-  panelOpenTab.addEventListener('click', ()=>{
-    panel.classList.remove('hidden');
-    panelOpenTab.classList.remove('show');
+    panel.classList.toggle('hidden');
   });
 
   function setSpinning(on){

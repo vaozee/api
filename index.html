@@ -96,7 +96,9 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; backgro
   border:1px solid var(--glass-edge); border-radius:var(--radius-pill);
   padding:9px 10px 9px 18px; box-shadow:var(--glass-shadow), inset 0 1.5px 0 var(--glass-edge-top), inset 0 -1px 0 rgba(0,0,0,0.12);
   max-width:min(94vw, 620px);
+  cursor:grab; user-select:none;
 }
+.hdr.dragging{cursor:grabbing; transition:none;}
 .hdr::before{
   content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
   background:var(--glass-sheen); mix-blend-mode:overlay; opacity:.9;
@@ -151,6 +153,35 @@ html[data-theme="light"] .theme-toggle .ic-moon{opacity:0; transform:translateY(
 .panel-scroll{overflow-y:auto; padding:16px 16px 20px; flex:1;}
 .panel-scroll::-webkit-scrollbar{width:6px;}
 .panel-scroll::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px;}
+
+/* ---------- floating "sumber data" box (toggled from header, draggable) ---------- */
+.source-box{
+  position:fixed; top:74px; left:50%; transform:translateX(-50%); z-index:50; width:320px; max-width:90vw;
+  background:var(--panel); backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border:1px solid var(--glass-edge); border-radius:var(--radius);
+  box-shadow:var(--glass-shadow), inset 0 1.5px 0 var(--glass-edge-top), inset 0 -1px 0 rgba(0,0,0,0.1);
+  overflow:hidden; transition:opacity .18s ease, transform .18s ease;
+}
+.source-box::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:var(--glass-sheen); mix-blend-mode:overlay; opacity:.9;
+}
+.source-box.hidden{display:none;}
+.source-box.dragging{transition:none;}
+.source-box-head{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:12px 14px 10px; cursor:grab; user-select:none; border-bottom:1px solid var(--line);
+}
+.source-box-head.dragging{cursor:grabbing;}
+.source-box-head .p-eyebrow{margin:0;}
+.source-box-close{
+  width:24px; height:24px; border-radius:50%; border:1px solid var(--glass-edge); background:var(--field-bg);
+  color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
+  font-size:12px; line-height:1; transition:background .15s, border-color .15s;
+}
+.source-box-close:hover{background:var(--field-bg-hover); border-color:var(--ember-dim);}
+.source-box-body{padding:14px 14px 16px;}
 .p-eyebrow{font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.14em; color:var(--ember-bright);
   text-transform:uppercase; margin:0 0 4px;}
 .p-title{font-size:13px; font-weight:700; margin:0 0 10px; color:var(--text);}
@@ -322,16 +353,21 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
     <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></svg>
     <svg class="ic-moon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M15 3a9 9 0 1 0 6 15.5A9.5 9.5 0 0 1 15 3Z"/></svg>
   </button>
+  <button class="hdr-btn" id="sourceInfoBtn" title="Sumber data" aria-label="Sumber data">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+  </button>
   <button class="hdr-btn" id="panelToggleBtn" title="Panel kontrol" aria-label="Panel kontrol">☰</button>
 </header>
 
 <div class="panel-open-tab" id="panelOpenTab" title="Buka panel">☰</div>
 
-<aside class="panel" id="panel">
-  <div class="panel-scroll">
-    <div class="status-banner" id="statusBanner"></div>
-    <div class="block" id="keyBlock">
-      <p class="p-eyebrow">Sumber Data</p>
+<div class="source-box hidden" id="sourceBox">
+  <div class="source-box-head" id="sourceBoxHead">
+    <p class="p-eyebrow">Sumber Data</p>
+    <button class="source-box-close" id="sourceBoxClose" title="Tutup" aria-label="Tutup">✕</button>
+  </div>
+  <div class="source-box-body">
+    <div class="block" id="keyBlock" style="margin-bottom:0; padding-bottom:0; border-bottom:none;">
       <p class="p-title">NASA FIRMS — MAP_KEY</p>
       <div class="field" style="margin-bottom:8px;">
         <label for="mapKeyInput">Kunci API gratis FIRMS</label>
@@ -341,12 +377,17 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
       <button class="btn ghost" id="demoBtn" style="margin-top:8px;">Coba data contoh (offline)</button>
       <p class="hint">Belum punya kunci? Daftar gratis di <a href="https://firms.modaps.eosdis.nasa.gov/api/map_key/" target="_blank" rel="noopener">firms.modaps.eosdis.nasa.gov/api/map_key</a> — kunci disimpan hanya di peramban perangkat ini.</p>
     </div>
-    <div class="block" id="embeddedKeyBlock" style="display:none;">
-      <p class="p-eyebrow">Sumber Data</p>
+    <div class="block" id="embeddedKeyBlock" style="display:none; margin-bottom:0; padding-bottom:0; border-bottom:none;">
       <p class="p-title">NASA FIRMS</p>
       <p class="hint" style="margin-top:0;">Kunci API sudah tertanam di halaman ini — data dimuat otomatis, tidak perlu memasukkan apa pun.</p>
       <button class="btn ghost" id="demoBtn2" style="margin-top:8px;">Coba data contoh (offline)</button>
     </div>
+  </div>
+</div>
+
+<aside class="panel" id="panel">
+  <div class="panel-scroll">
+    <div class="status-banner" id="statusBanner"></div>
 
     <div class="block">
       <p class="p-eyebrow">Cakupan &amp; Periode</p>
@@ -525,11 +566,71 @@ const KAL_KEC_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
   const demoBtn2 = document.getElementById('demoBtn2');
   const keyBlock = document.getElementById('keyBlock');
   const embeddedKeyBlock = document.getElementById('embeddedKeyBlock');
+  const sourceInfoBtn = document.getElementById('sourceInfoBtn');
+  const sourceBox = document.getElementById('sourceBox');
+  const sourceBoxHead = document.getElementById('sourceBoxHead');
+  const sourceBoxClose = document.getElementById('sourceBoxClose');
 
   themeToggleBtn.addEventListener('click', ()=>{
     const cur = document.documentElement.getAttribute('data-theme') || 'dark';
     applyTheme(cur === 'dark' ? 'light' : 'dark');
   });
+
+  // ---------- tombol tunggal "Sumber Data" di header ----------
+  sourceInfoBtn.addEventListener('click', ()=>{ sourceBox.classList.toggle('hidden'); });
+  sourceBoxClose.addEventListener('click', ()=>{ sourceBox.classList.add('hidden'); });
+
+  // ---------- drag header & kotak sumber data ----------
+  function makeDraggable(el, handle){
+    handle = handle || el;
+    let dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    function down(e){
+      if(e.target.closest('button, a, input, select, textarea')) return;
+      const rect = el.getBoundingClientRect();
+      el.style.left = rect.left + 'px';
+      el.style.top = rect.top + 'px';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+      el.style.transform = 'none';
+      startLeft = rect.left; startTop = rect.top;
+      startX = e.touches ? e.touches[0].clientX : e.clientX;
+      startY = e.touches ? e.touches[0].clientY : e.clientY;
+      dragging = true;
+      el.classList.add('dragging');
+      handle.classList.add('dragging');
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+      document.addEventListener('touchmove', move, { passive:false });
+      document.addEventListener('touchend', up);
+    }
+    function move(e){
+      if(!dragging) return;
+      const x = e.touches ? e.touches[0].clientX : e.clientX;
+      const y = e.touches ? e.touches[0].clientY : e.clientY;
+      let newLeft = startLeft + (x - startX);
+      let newTop = startTop + (y - startY);
+      const maxLeft = Math.max(4, window.innerWidth - el.offsetWidth - 4);
+      const maxTop = Math.max(4, window.innerHeight - el.offsetHeight - 4);
+      newLeft = Math.min(Math.max(4, newLeft), maxLeft);
+      newTop = Math.min(Math.max(4, newTop), maxTop);
+      el.style.left = newLeft + 'px';
+      el.style.top = newTop + 'px';
+      if(e.cancelable) e.preventDefault();
+    }
+    function up(){
+      dragging = false;
+      el.classList.remove('dragging');
+      handle.classList.remove('dragging');
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      document.removeEventListener('touchmove', move);
+      document.removeEventListener('touchend', up);
+    }
+    handle.addEventListener('mousedown', down);
+    handle.addEventListener('touchstart', down, { passive:false });
+  }
+  makeDraggable(document.querySelector('.hdr'));
+  makeDraggable(sourceBox, sourceBoxHead);
 
   // ---------- STORAGE / EMBEDDED KEY ----------
   const LS_KEY = 'psam_firms_map_key';

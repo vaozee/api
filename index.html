@@ -13,9 +13,9 @@
 <style>
 :root, html[data-theme="dark"]{
   --bg-deep:#05070a;
-  --panel:rgba(13,15,20,0.62);
-  --panel-2:rgba(20,22,28,0.7);
-  --line:rgba(255,255,255,0.09);
+  --panel:rgba(13,15,20,0.72);
+  --panel-2:rgba(23,25,32,0.78);
+  --line:rgba(255,255,255,0.14);
   --text:#edf0f6;
   --text-dim:#9aa3b8;
   --text-faint:#6b7488;
@@ -27,18 +27,34 @@
   --nominal:#f2b134;
   --high:#ef4444;
   --good:#4fbf8f;
-  --tile-filter:saturate(0.85) brightness(0.92);
+  --popup-bg:rgba(18,20,26,0.85);
+  --popup-text:#edf0f6;
+  --popup-text-dim:#9aa8bd;
+  --status-danger-bg:rgba(239,68,68,0.14);
+  --status-danger-text:#ffd3ce;
+  --status-info-bg:rgba(91,143,217,0.14);
+  --status-info-text:#cfe0f7;
+  --tile-filter:saturate(1.05) brightness(0.62) contrast(1.08);
   --radius:14px;
   --radius-pill:999px;
+  --field-bg:rgba(255,255,255,0.08);
+  --field-bg-hover:rgba(255,255,255,0.13);
+  --arrow:#c7cddb;
+  --glass-blur:30px;
+  --glass-sat:200%;
+  --glass-sheen:linear-gradient(122deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.05) 22%, rgba(255,255,255,0) 45%, rgba(255,255,255,0) 72%, rgba(255,255,255,0.09) 100%);
+  --glass-edge-top:rgba(255,255,255,0.55);
+  --glass-edge:rgba(255,255,255,0.16);
+  --glass-shadow:0 20px 50px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.35);
 }
 html[data-theme="light"]{
-  --bg-deep:#eef1ea;
-  --panel:rgba(255,255,255,0.72);
-  --panel-2:rgba(255,255,255,0.85);
-  --line:rgba(20,20,15,0.12);
-  --text:#1c1e18;
-  --text-dim:#5b5f52;
-  --text-faint:#83876f;
+  --bg-deep:#e7ebe2;
+  --panel:rgba(255,255,255,0.84);
+  --panel-2:rgba(255,255,255,0.92);
+  --line:rgba(20,20,15,0.16);
+  --text:#191b15;
+  --text-dim:#464a3d;
+  --text-faint:#6b6f5e;
   --ember:#d9491f;
   --ember-bright:#b8391a;
   --ember-dim:#f0a480;
@@ -47,7 +63,23 @@ html[data-theme="light"]{
   --nominal:#b5810a;
   --high:#c92f2f;
   --good:#28885f;
-  --tile-filter:none;
+  --popup-bg:rgba(255,255,255,0.82);
+  --popup-text:#1c1e18;
+  --popup-text-dim:#5b5f52;
+  --status-danger-bg:rgba(201,47,47,0.09);
+  --status-danger-text:#8a1f1f;
+  --status-info-bg:rgba(47,111,194,0.09);
+  --status-info-text:#1c4e82;
+  --tile-filter:saturate(1.05) brightness(1.04) contrast(1.02);
+  --field-bg:rgba(20,20,15,0.06);
+  --field-bg-hover:rgba(20,20,15,0.1);
+  --arrow:#5b5f52;
+  --glass-blur:30px;
+  --glass-sat:180%;
+  --glass-sheen:linear-gradient(122deg, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.18) 22%, rgba(255,255,255,0) 45%, rgba(255,255,255,0) 72%, rgba(255,255,255,0.35) 100%);
+  --glass-edge-top:rgba(255,255,255,0.9);
+  --glass-edge:rgba(20,20,15,0.14);
+  --glass-shadow:0 20px 46px rgba(60,55,40,.22), 0 2px 8px rgba(60,55,40,.12);
 }
 *{box-sizing:border-box;}
 html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:var(--bg-deep); color:var(--text);
@@ -59,10 +91,15 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; backgro
 .hdr{
   position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:40;
   display:flex; align-items:center; gap:14px;
-  background:var(--panel); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-  border:1px solid var(--line); border-radius:var(--radius-pill);
-  padding:9px 10px 9px 18px; box-shadow:0 16px 44px rgba(0,0,0,.45);
+  background:var(--panel); backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border:1px solid var(--glass-edge); border-radius:var(--radius-pill);
+  padding:9px 10px 9px 18px; box-shadow:var(--glass-shadow), inset 0 1.5px 0 var(--glass-edge-top), inset 0 -1px 0 rgba(0,0,0,0.12);
   max-width:min(94vw, 620px);
+}
+.hdr::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:var(--glass-sheen); mix-blend-mode:overlay; opacity:.9;
 }
 .hdr .dot{width:8px; height:8px; border-radius:50%; background:var(--ember); flex:none; box-shadow:0 0 10px var(--ember);
   animation:pulse 1.8s ease-in-out infinite;}
@@ -71,11 +108,13 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; backgro
 .hdr .sub{font-size:10.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .hdr .htxt{min-width:0;}
 .hdr-btn{
-  width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--panel-2);
+  width:34px; height:34px; border-radius:50%; border:1px solid var(--glass-edge); background:var(--panel-2);
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  box-shadow:inset 0 1px 0 var(--glass-edge-top), 0 3px 10px rgba(0,0,0,.18);
   color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
   font-size:15px; transition:border-color .15s, background .15s, transform .15s;
 }
-.hdr-btn:hover{border-color:var(--ember-dim); background:#1c1712;}
+.hdr-btn:hover{border-color:var(--ember-dim); background:var(--field-bg-hover); transform:translateY(-1px);}
 .hdr-btn.spinning svg{animation:spin 0.9s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .theme-toggle{position:relative; overflow:hidden;}
@@ -87,19 +126,26 @@ html[data-theme="light"] .theme-toggle .ic-moon{opacity:0; transform:translateY(
 
 .status-banner{
   display:none; align-items:flex-start; gap:9px; padding:10px 11px; border-radius:10px; margin-bottom:14px;
-  font-size:11.5px; line-height:1.5; border:1px solid rgba(239,68,68,0.35); background:rgba(239,68,68,0.1); color:#ffd3ce;
+  font-size:11.5px; line-height:1.5; border:1px solid transparent;
+  background:var(--status-danger-bg); color:var(--status-danger-text);
 }
 .status-banner.show{display:flex;}
-.status-banner.info{border-color:rgba(91,143,217,0.4); background:rgba(91,143,217,0.1); color:#cfe0f7;}
+.status-banner.info{background:var(--status-info-bg); color:var(--status-info-text);}
 .status-banner b{display:block; margin-bottom:2px; color:inherit;}
 .status-banner .retry-link{color:inherit; text-decoration:underline; cursor:pointer; font-weight:700;}
 
 /* ---------- side panel ---------- */
 .panel{
   position:fixed; top:74px; left:14px; bottom:14px; z-index:35; width:340px; max-width:88vw;
-  background:var(--panel); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
-  border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 20px 54px rgba(0,0,0,.5);
+  background:var(--panel); backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border:1px solid var(--glass-edge); border-radius:var(--radius);
+  box-shadow:var(--glass-shadow), inset 0 1.5px 0 var(--glass-edge-top), inset 0 -1px 0 rgba(0,0,0,0.1);
   display:flex; flex-direction:column; overflow:hidden; transition:transform .22s ease, opacity .22s ease;
+}
+.panel::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:var(--glass-sheen); mix-blend-mode:overlay; opacity:.9;
 }
 .panel.hidden{transform:translateX(calc(-100% - 24px)); opacity:0; pointer-events:none;}
 .panel-scroll{overflow-y:auto; padding:16px 16px 20px; flex:1;}
@@ -113,28 +159,38 @@ html[data-theme="light"] .theme-toggle .ic-moon{opacity:0; transform:translateY(
 .field label{display:block; font-size:10px; color:var(--text-dim); margin-bottom:5px; letter-spacing:.02em;}
 select, input[type=text], input[type=password]{
   width:100%; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text);
-  background:rgba(255,255,255,0.04); border:1px solid var(--line); border-radius:8px;
-  padding:8px 9px; outline:none;
+  background:var(--field-bg); border:1px solid var(--line); border-radius:8px;
+  padding:8px 9px; outline:none; transition:background .15s, border-color .15s;
 }
-select:focus, input:focus{border-color:var(--ember-dim);}
-select option{background:#14161c; color:var(--text);}
-.block{margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.06);}
+select:hover, input:hover{background:var(--field-bg-hover);}
+select:focus, input:focus{border-color:var(--ember-dim); background:var(--field-bg-hover);}
+select{appearance:none; -webkit-appearance:none; -moz-appearance:none; padding-right:28px; cursor:pointer;}
+select option{background:var(--popup-bg); color:var(--popup-text);}
+.select-wrap{position:relative;}
+.select-wrap::after{
+  content:''; position:absolute; right:11px; top:50%; margin-top:-1px; transform:translateY(-50%);
+  width:10px; height:10px; pointer-events:none; background:var(--arrow);
+  -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 9l6 6 6-6' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/></svg>") center/contain no-repeat;
+  mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 9l6 6 6-6' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/></svg>") center/contain no-repeat;
+}
+.block{margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--line);}
 .block:last-of-type{border-bottom:none;}
 .btn{
   font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700; padding:9px 14px;
-  border-radius:10px; border:1px solid var(--line); background:var(--panel-2); color:var(--text);
+  border-radius:10px; border:1px solid var(--glass-edge); background:var(--panel-2); color:var(--text);
+  box-shadow:inset 0 1px 0 var(--glass-edge-top);
   cursor:pointer; transition:border-color .15s, background .15s, transform .1s; width:100%;
 }
-.btn:hover{border-color:var(--ember-dim); background:#1c1712;}
+.btn:hover{border-color:var(--ember-dim); background:var(--field-bg-hover);}
 .btn:active{transform:translateY(1px);}
-.btn.primary{background:linear-gradient(135deg, var(--ember-dim), var(--ember)); color:#1c0900; border:none;}
+.btn.primary{background:linear-gradient(135deg, var(--ember-dim), var(--ember)); color:#1c0900; border:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.4);}
 .btn.primary:hover{filter:brightness(1.08);}
-.btn.ghost{background:transparent;}
+.btn.ghost{background:transparent; box-shadow:none;}
 .hint{font-size:10.5px; color:var(--text-faint); line-height:1.5; margin:8px 0 0;}
 .hint a{color:var(--gold); text-decoration:none; border-bottom:1px dotted var(--gold);}
 
 .stat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:4px;}
-.stat{background:rgba(255,255,255,0.04); border:1px solid var(--line); border-radius:10px; padding:9px 8px; text-align:center;}
+.stat{background:var(--field-bg); border:1px solid var(--glass-edge); border-radius:10px; padding:9px 8px; text-align:center; box-shadow:inset 0 1px 0 var(--glass-edge-top);}
 .stat .n{font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700;}
 .stat .l{font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-top:2px;}
 .stat.low .n{color:var(--low);} .stat.nominal .n{color:var(--nominal);} .stat.high .n{color:var(--high);}
@@ -146,7 +202,7 @@ select option{background:#14161c; color:var(--text);}
   display:flex; gap:10px; align-items:flex-start; padding:9px 8px; border-radius:9px; cursor:pointer;
   border:1px solid transparent;
 }
-.list-item:hover{background:rgba(255,255,255,0.045); border-color:var(--line);}
+.list-item:hover{background:var(--field-bg-hover); border-color:var(--glass-edge);}
 .list-item .sw{width:9px; height:9px; border-radius:50%; margin-top:4px; flex:none;}
 .list-item .li-main{flex:1; min-width:0;}
 .list-item .li-loc{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--text);}
@@ -158,27 +214,88 @@ select option{background:#14161c; color:var(--text);}
 /* ---------- panel reopen tab ---------- */
 .panel-open-tab{
   position:fixed; top:74px; left:14px; z-index:34; width:38px; height:38px; border-radius:12px;
-  background:var(--panel); border:1px solid var(--line); backdrop-filter:blur(14px);
+  background:var(--panel); border:1px solid var(--glass-edge);
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
   display:none; align-items:center; justify-content:center; cursor:pointer; font-size:16px;
-  box-shadow:0 12px 30px rgba(0,0,0,.4);
+  box-shadow:var(--glass-shadow), inset 0 1.5px 0 var(--glass-edge-top);
 }
 .panel-open-tab.show{display:flex;}
 
 /* ---------- toast ---------- */
 .toast{
   position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(20px); z-index:60;
-  background:#171512; border:1px solid var(--line); color:var(--text); font-size:12.5px; font-weight:600;
-  padding:10px 18px; border-radius:var(--radius-pill); box-shadow:0 14px 40px rgba(0,0,0,.5);
+  background:var(--panel-2); backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border:1px solid var(--glass-edge); color:var(--text); font-size:12.5px; font-weight:600;
+  padding:10px 18px; border-radius:var(--radius-pill); box-shadow:var(--glass-shadow), inset 0 1.5px 0 var(--glass-edge-top);
   opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
 }
 .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
-.toast.err{border-color:rgba(239,68,68,0.5); color:#ffd3ce;}
+.toast.err{border-color:rgba(239,68,68,0.5); color:var(--high);}
 
-.leaflet-popup-content-wrapper{background:#14161c; color:var(--text); border-radius:12px; box-shadow:0 14px 36px rgba(0,0,0,.5);}
-.leaflet-popup-tip{background:#14161c;}
-.pop-title{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12.5px; margin-bottom:4px;}
-.pop-row{font-size:11.5px; color:#b7bfd0; margin:2px 0;}
-.pop-row b{color:var(--text);}
+.leaflet-popup-content-wrapper{
+  background:var(--popup-bg); color:var(--popup-text); border-radius:12px;
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)); -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border:1px solid var(--glass-edge); box-shadow:var(--glass-shadow), inset 0 1.5px 0 var(--glass-edge-top);
+}
+.leaflet-popup-tip{background:var(--popup-bg); backdrop-filter:blur(var(--glass-blur));}
+.pop-title{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12.5px; margin-bottom:4px; color:var(--popup-text);}
+.pop-row{font-size:11.5px; color:var(--popup-text-dim); margin:2px 0;}
+.pop-row b{color:var(--popup-text);}
+.pop-row.faint{color:var(--popup-text-dim); opacity:.8;}
+.leaflet-popup-close-button{color:var(--popup-text-dim) !important;}
+.pop-divider{border-top:1px dashed var(--line); margin:7px 0 6px;}
+.pop-eyebrow{font-family:'JetBrains Mono',monospace; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ember-bright); margin:0 0 5px;}
+.pop-admin{display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:3px;}
+.pop-admin .pl{font-size:11px; color:var(--popup-text-dim); white-space:nowrap;}
+.pop-admin .pv{font-size:11.5px; color:var(--popup-text); font-weight:600; text-align:right;}
+.pop-loading{font-size:11px; color:var(--popup-text-dim); display:flex; align-items:center; gap:6px;}
+.pop-spin{width:10px; height:10px; border-radius:50%; border:2px solid var(--popup-text-dim); border-top-color:transparent; animation:spin .7s linear infinite; flex:none;}
+
+/* ---------- animated flame marker ---------- */
+.flame-icon{background:none !important; border:none !important;}
+.flame-wrap{
+  position:relative; width:100%; height:100%; display:flex; align-items:flex-end; justify-content:center;
+  transform-origin:50% 92%; animation:flameFlicker 1.15s ease-in-out infinite;
+  filter:drop-shadow(0 0 5px rgba(255,110,40,.65));
+}
+.flame-wrap.low{animation-duration:1.5s;}
+.flame-wrap.nominal{animation-duration:1.25s;}
+.flame-wrap.high{animation-duration:0.95s;}
+.flame-wrap svg{display:block;}
+.flame-glow{
+  position:absolute; bottom:-1px; left:50%; width:75%; height:38%; border-radius:50%;
+  transform:translateX(-50%); filter:blur(5px); opacity:.6; z-index:-1; animation:glowPulse 1.15s ease-in-out infinite;
+}
+@keyframes flameFlicker{
+  0%,100%{ transform:scale(1,1) rotate(-2deg); }
+  22%{ transform:scale(1.08,0.92) rotate(2deg); }
+  45%{ transform:scale(0.93,1.07) rotate(-3deg); }
+  68%{ transform:scale(1.05,0.95) rotate(1deg); }
+  85%{ transform:scale(0.97,1.03) rotate(-1deg); }
+}
+@keyframes glowPulse{
+  0%,100%{ opacity:.5; transform:translateX(-50%) scale(1); }
+  50%{ opacity:.8; transform:translateX(-50%) scale(1.18); }
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ---------- glass cluster bubbles ---------- */
+.cluster-icon-wrap{background:none !important; border:none !important;}
+.cluster-glass{
+  position:relative; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  border:1.5px solid rgba(255,255,255,0.55);
+  backdrop-filter:blur(9px) saturate(180%); -webkit-backdrop-filter:blur(9px) saturate(180%);
+  transition:transform .15s ease;
+}
+.cluster-glass:hover{transform:scale(1.06);}
+.cluster-sheen{
+  position:absolute; top:14%; left:20%; width:38%; height:22%; border-radius:50%;
+  background:rgba(255,255,255,0.75); filter:blur(3px); pointer-events:none;
+}
+.cluster-count{
+  position:relative; z-index:1; color:#fff; font-family:'JetBrains Mono',monospace; font-weight:800;
+  font-size:13px; text-shadow:0 1px 3px rgba(0,0,0,.6);
+}
 
 @media (max-width:640px){
   .panel{ top:auto; bottom:0; left:0; right:0; width:100%; max-width:100%; height:70vh; border-radius:16px 16px 0 0; }
@@ -213,7 +330,7 @@ select option{background:#14161c; color:var(--text);}
 <aside class="panel" id="panel">
   <div class="panel-scroll">
     <div class="status-banner" id="statusBanner"></div>
-    <div class="block">
+    <div class="block" id="keyBlock">
       <p class="p-eyebrow">Sumber Data</p>
       <p class="p-title">NASA FIRMS — MAP_KEY</p>
       <div class="field" style="margin-bottom:8px;">
@@ -224,36 +341,51 @@ select option{background:#14161c; color:var(--text);}
       <button class="btn ghost" id="demoBtn" style="margin-top:8px;">Coba data contoh (offline)</button>
       <p class="hint">Belum punya kunci? Daftar gratis di <a href="https://firms.modaps.eosdis.nasa.gov/api/map_key/" target="_blank" rel="noopener">firms.modaps.eosdis.nasa.gov/api/map_key</a> — kunci disimpan hanya di peramban perangkat ini.</p>
     </div>
+    <div class="block" id="embeddedKeyBlock" style="display:none;">
+      <p class="p-eyebrow">Sumber Data</p>
+      <p class="p-title">NASA FIRMS</p>
+      <p class="hint" style="margin-top:0;">Kunci API sudah tertanam di halaman ini — data dimuat otomatis, tidak perlu memasukkan apa pun.</p>
+      <button class="btn ghost" id="demoBtn2" style="margin-top:8px;">Coba data contoh (offline)</button>
+    </div>
 
     <div class="block">
       <p class="p-eyebrow">Cakupan &amp; Periode</p>
       <div class="field-row">
         <div class="field">
           <label for="regionSelect">Wilayah</label>
-          <select id="regionSelect">
-            <option value="kalteng" selected>Kalimantan Tengah</option>
-            <option value="kalimantan">Kalimantan (semua)</option>
-            <option value="sumatera">Sumatera</option>
-            <option value="indonesia">Indonesia (nasional)</option>
-          </select>
+          <div class="select-wrap">
+            <select id="regionSelect">
+              <option value="kalteng" selected>Kalimantan Tengah</option>
+              <option value="kalimantan">Kalimantan (semua)</option>
+              <option value="sumatera">Sumatera</option>
+              <option value="indonesia">Indonesia (nasional)</option>
+            </select>
+          </div>
         </div>
         <div class="field">
           <label for="rangeSelect">Periode</label>
-          <select id="rangeSelect">
-            <option value="1" selected>24 jam</option>
-            <option value="2">48 jam</option>
-            <option value="3">3 hari</option>
-            <option value="7">7 hari</option>
-          </select>
+          <div class="select-wrap">
+            <select id="rangeSelect">
+              <option value="1" selected>24 jam</option>
+              <option value="2">48 jam</option>
+              <option value="3">3 hari</option>
+              <option value="7">7 hari</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="field">
         <label for="sourceSelect">Satelit / sensor</label>
-        <select id="sourceSelect">
-          <option value="VIIRS_SNPP_NRT" selected>VIIRS Suomi-NPP (375 m)</option>
-          <option value="VIIRS_NOAA20_NRT">VIIRS NOAA-20 (375 m)</option>
-          <option value="MODIS_NRT">MODIS Terra/Aqua (1 km)</option>
-        </select>
+        <div class="select-wrap">
+          <select id="sourceSelect">
+            <option value="VIIRS_SNPP_NRT" selected>VIIRS Suomi-NPP (375 m)</option>
+            <option value="VIIRS_NOAA20_NRT">VIIRS NOAA-20 (375 m)</option>
+            <option value="VIIRS_NOAA21_NRT">VIIRS NOAA-21 (375 m)</option>
+            <option value="MODIS_NRT">MODIS Terra/Aqua (1 km)</option>
+            <option value="LANDSAT_NRT">Landsat (30 m, cakupan terbatas)</option>
+          </select>
+        </div>
+        <p class="hint" style="margin-top:6px;">VIIRS (375 m) paling akurat untuk titik kecil. Landsat saat ini baru mencakup sebagian Amerika Utara — kemungkinan besar kosong untuk wilayah Indonesia.</p>
       </div>
     </div>
 
@@ -274,7 +406,7 @@ select option{background:#14161c; color:var(--text);}
       <div id="hotspotList"><div class="empty-note">Belum ada data. Masukkan MAP_KEY lalu tekan "Simpan &amp; Muat Data".</div></div>
     </div>
 
-    <a class="btn ghost" style="display:block; text-align:center; text-decoration:none;" href="https://sipongi.gakkum.kehutanan.go.id/sebaran-titik-panas" target="_blank" rel="noopener">↗ Buka data resmi SIPONGI KLHK</a>
+    <a class="btn ghost" style="display:block; text-align:center; text-decoration:none;" href="https://sipongi.gakkum.kehutanan.go.id/peta" target="_blank" rel="noopener">↗ Buka data resmi SIPONGI KLHK</a>
     <p class="source-note">Halaman ini memuat data hotspot langsung dari <b>NASA FIRMS</b> (VIIRS/MODIS) — sumber satelit yang sama dipakai SIPONGI KLHK. SIPONGI sendiri tidak menyediakan API publik untuk disematkan, sehingga verifikasi resmi tetap merujuk ke tautan di atas. Setiap penggunaan ulang data wajib mencantumkan sumber sesuai ketentuan masing-masing penyedia.</p>
   </div>
 </aside>
@@ -287,6 +419,16 @@ select option{background:#14161c; color:var(--text);}
 (function(){
   'use strict';
 
+  // ==========================================================
+  // KUNCI FIRMS BAWAAN (opsional)
+  // Tempel MAP_KEY FIRMS Anda di antara tanda kutip di bawah ini
+  // supaya SEMUA orang yang membuka halaman ini langsung bisa
+  // memakainya tanpa perlu memasukkan/menyimpan kunci sendiri.
+  // Daftar gratis di: https://firms.modaps.eosdis.nasa.gov/api/map_key/
+  // Kosongkan ('') untuk kembali ke mode "setiap pengguna pakai kuncinya sendiri".
+  // ==========================================================
+  const EMBEDDED_MAP_KEY = 'f2b38cbba0858adb6024b1c8a5ffa649';
+
   // ---------- REGION PRESETS (west,south,east,north) ----------
   const REGIONS = {
     kalteng:    { bbox:'110.5,-4.2,114.8,0.6', center:[-1.9,112.6], zoom:7,  label:'Kalimantan Tengah' },
@@ -295,30 +437,43 @@ select option{background:#14161c; color:var(--text);}
     indonesia:  { bbox:'94,-11.5,141.5,6.5',   center:[-2.5,117.5], zoom:5,  label:'Indonesia' }
   };
   const SOURCE_LABELS = {
-    VIIRS_SNPP_NRT:'VIIRS Suomi-NPP', VIIRS_NOAA20_NRT:'VIIRS NOAA-20', MODIS_NRT:'MODIS Terra/Aqua'
+    VIIRS_SNPP_NRT:'VIIRS Suomi-NPP', VIIRS_NOAA20_NRT:'VIIRS NOAA-20', VIIRS_NOAA21_NRT:'VIIRS NOAA-21',
+    MODIS_NRT:'MODIS Terra/Aqua', LANDSAT_NRT:'Landsat'
   };
 
-  // ---------- THEME ----------
+  // ---------- THEME (UI only — glass panels, colors) ----------
   const THEME_KEY = 'psam_hotspot_theme';
-  let tileLayer = null;
-  function buildTileLayer(theme){
-    const url = theme === 'light'
-      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    return L.tileLayer(url, { attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18, subdomains:'abcd' });
-  }
   function applyTheme(t){
     document.documentElement.setAttribute('data-theme', t);
     localStorage.setItem(THEME_KEY, t);
-    if(tileLayer) map.removeLayer(tileLayer);
-    tileLayer = buildTileLayer(t).addTo(map);
+  }
+
+  // ---------- MAP BASEMAP: citra satelit terkini (Esri World Imagery) + label/batas wilayah ----------
+  function buildImageryLayer(){
+    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics, GIS User Community',
+      maxZoom:19
+    });
+  }
+  function buildLabelsLayer(){
+    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom:19, pane:'labelsPane'
+    });
   }
 
   // ---------- MAP ----------
   const map = L.map('map', { zoomControl:false, attributionControl:true }).setView(REGIONS.kalteng.center, REGIONS.kalteng.zoom);
   L.control.zoom({ position:'bottomright' }).addTo(map);
+  map.createPane('labelsPane');
+  map.getPane('labelsPane').style.zIndex = 350; // above imagery, below markers
+  buildImageryLayer().addTo(map);
+  buildLabelsLayer().addTo(map);
   applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
 
+  function hexToRgb(hex){
+    const h = hex.replace('#','');
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  }
   const clusterGroup = L.markerClusterGroup({
     maxClusterRadius:44,
     iconCreateFunction: function(cluster){
@@ -326,11 +481,15 @@ select option{background:#14161c; color:var(--text);}
       let cls = 'low';
       cluster.getAllChildMarkers().forEach(m=>{ if(m.options.confClass==='high') cls='high'; else if(m.options.confClass==='nominal' && cls!=='high') cls='nominal'; });
       const color = cls==='high' ? '#ef4444' : cls==='nominal' ? '#f2b134' : '#5b8fd9';
-      return L.divIcon({
-        html:`<div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-              background:${color}33;border:2px solid ${color};color:#fff;font-family:JetBrains Mono,monospace;font-weight:700;font-size:12px;">${n}</div>`,
-        className:'', iconSize:[38,38]
-      });
+      const [r,g,b] = hexToRgb(color);
+      const size = n>=50 ? 46 : n>=15 ? 42 : 38;
+      const html = `<div class="cluster-glass" style="width:${size}px;height:${size}px;
+        background:radial-gradient(circle at 34% 26%, rgba(${r},${g},${b},0.85) 0%, rgba(${r},${g},${b},0.62) 55%, rgba(${r},${g},${b},0.52) 100%);
+        box-shadow:0 8px 20px rgba(${r},${g},${b},0.45), 0 2px 6px rgba(0,0,0,.3), inset 0 1.5px 0 rgba(255,255,255,.65), inset 0 -6px 10px rgba(0,0,0,.2);">
+        <span class="cluster-sheen"></span>
+        <span class="cluster-count">${n}</span>
+      </div>`;
+      return L.divIcon({ html, className:'cluster-icon-wrap', iconSize:[size,size] });
     }
   });
   map.addLayer(clusterGroup);
@@ -354,16 +513,25 @@ select option{background:#14161c; color:var(--text);}
   const themeToggleBtn = document.getElementById('themeToggleBtn');
   const statusBanner = document.getElementById('statusBanner');
   const demoBtn = document.getElementById('demoBtn');
+  const demoBtn2 = document.getElementById('demoBtn2');
+  const keyBlock = document.getElementById('keyBlock');
+  const embeddedKeyBlock = document.getElementById('embeddedKeyBlock');
 
   themeToggleBtn.addEventListener('click', ()=>{
     const cur = document.documentElement.getAttribute('data-theme') || 'dark';
     applyTheme(cur === 'dark' ? 'light' : 'dark');
   });
 
-  // ---------- STORAGE ----------
+  // ---------- STORAGE / EMBEDDED KEY ----------
   const LS_KEY = 'psam_firms_map_key';
+  const hasEmbeddedKey = !!EMBEDDED_MAP_KEY.trim();
   const savedKey = localStorage.getItem(LS_KEY);
   if(savedKey) mapKeyInput.value = savedKey;
+  if(hasEmbeddedKey){
+    keyBlock.style.display = 'none';
+    embeddedKeyBlock.style.display = '';
+    if(demoBtn2) demoBtn2.addEventListener('click', loadDemoData);
+  }
 
   // ---------- UI helpers ----------
   let toastTimer = null;
@@ -447,7 +615,8 @@ select option{background:#14161c; color:var(--text);}
     const attempts = [
       { label:'langsung', get: ()=> fetch(directUrl).then(r=>r.text().then(t=>({ok:r.ok, status:r.status, text:t}))) },
       { label:'proxy cadangan 1', get: ()=> fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl)).then(r=>r.text().then(t=>({ok:r.ok, status:r.status, text:t}))) },
-      { label:'proxy cadangan 2', get: ()=> fetch('https://corsproxy.io/?url=' + encodeURIComponent(directUrl)).then(r=>r.text().then(t=>({ok:r.ok, status:r.status, text:t}))) }
+      { label:'proxy cadangan 2', get: ()=> fetch('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(directUrl)).then(r=>r.text().then(t=>({ok:r.ok, status:r.status, text:t}))) },
+      { label:'proxy cadangan 3', get: ()=> fetch('https://corsproxy.io/?url=' + encodeURIComponent(directUrl)).then(r=>r.text().then(t=>({ok:r.ok, status:r.status, text:t}))) }
     ];
     let lastErr = null;
     for(const attempt of attempts){
@@ -466,7 +635,7 @@ select option{background:#14161c; color:var(--text);}
   }
 
   async function loadHotspots(){
-    const key = mapKeyInput.value.trim();
+    const key = hasEmbeddedKey ? EMBEDDED_MAP_KEY.trim() : mapKeyInput.value.trim();
     if(!key){
       showToast('Masukkan MAP_KEY FIRMS terlebih dahulu', true);
       showStatus('<b>Belum ada MAP_KEY.</b> Tempel kunci FIRMS di kolom di atas lalu klik "Simpan &amp; Muat Data".', 'info');
@@ -484,7 +653,7 @@ select option{background:#14161c; color:var(--text);}
       const { text, via } = await fetchCsvRobust(url);
       const rows = parseCSV(text);
       renderHotspots(rows, source, region);
-      localStorage.setItem(LS_KEY, key);
+      if(!hasEmbeddedKey) localStorage.setItem(LS_KEY, key);
       const now = new Date();
       const pad = n => String(n).padStart(2,'0');
       hdrSub.textContent = `${region.label} · ${rows.length} titik · diperbarui ${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -535,6 +704,67 @@ select option{background:#14161c; color:var(--text);}
   }
   demoBtn.addEventListener('click', loadDemoData);
 
+  // ---------- animated flame icon ----------
+  let flameSeq = 0;
+  function flameIcon(bucket){
+    const color = bucket==='high' ? '#ef4444' : bucket==='nominal' ? '#f2b134' : '#ffb35c';
+    const size = bucket==='high' ? 30 : bucket==='nominal' ? 25 : 21;
+    const h = Math.round(size*1.3);
+    const delay = (Math.random()*1.4).toFixed(2);
+    const html = `<div class="flame-wrap ${bucket}" style="width:${size}px;height:${h}px;animation-delay:-${delay}s;">
+      <svg viewBox="0 0 24 32" width="${size}" height="${h}">
+        <path d="M12 1.5C7.5 7 4 11.2 4 17.2A8 8 0 0 0 12 25.2a8 8 0 0 0 8-8c0-3.6-1.6-5.8-2.7-7.6.2 3-1.1 4-2 4 .9-4.3-1-7.6-3.3-12.1z" fill="${color}"/>
+        <path d="M12 12.5c-1.6 2.4-2.6 4-2.6 6a3.4 3.4 0 0 0 6.8 0c0-1.4-.6-2.3-1-3 0 1.1-.7 1.5-1.2 1.4.6-1.7-.4-3-2-4.4z" fill="#fff4d6" opacity=".85"/>
+      </svg>
+      <div class="flame-glow" style="background:${color};"></div>
+    </div>`;
+    return L.divIcon({ className:'flame-icon', html, iconSize:[size,h], iconAnchor:[size/2, h*0.88], popupAnchor:[0, -h*0.8] });
+  }
+
+  // ---------- reverse geocoding (admin area: desa/kecamatan/kabupaten/provinsi) ----------
+  const geocodeCache = {};
+  function adminInfoHTML(info){
+    if(!info){
+      return `<div class="pop-row faint">Lokasi administratif tidak dapat diambil.</div>`;
+    }
+    return `<div class="pop-admin">
+      <span class="pl">Provinsi</span><span class="pv">${info.provinsi}</span>
+      <span class="pl">Kabupaten/Kota</span><span class="pv">${info.kabupaten}</span>
+      <span class="pl">Kecamatan</span><span class="pv">${info.kecamatan}</span>
+      <span class="pl">Desa/Kelurahan</span><span class="pv">${info.desa}</span>
+    </div>`;
+  }
+  async function reverseGeocode(lat, lon){
+    const cacheKey = lat.toFixed(3) + ',' + lon.toFixed(3);
+    if(geocodeCache[cacheKey]) return geocodeCache[cacheKey];
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1&accept-language=id`;
+    const res = await fetch(url, { headers:{ 'Accept':'application/json' } });
+    if(!res.ok) throw new Error('geocode gagal');
+    const data = await res.json();
+    const a = data.address || {};
+    const info = {
+      desa: a.village || a.hamlet || a.suburb || a.neighbourhood || a.town || '–',
+      kecamatan: a.suburb || a.county || a.state_district || a.municipality || '–',
+      kabupaten: a.county || a.city || a.regency || a.state_district || a.city_district || '–',
+      provinsi: a.state || '–'
+    };
+    geocodeCache[cacheKey] = info;
+    return info;
+  }
+  function wireAdminLookup(marker, lat, lon){
+    marker.on('popupopen', async ()=>{
+      const el = document.getElementById(marker._adminElId);
+      if(!el || el.dataset.loaded === '1') return;
+      try{
+        const info = await reverseGeocode(lat, lon);
+        el.innerHTML = adminInfoHTML(info);
+        el.dataset.loaded = '1';
+      } catch(e){
+        el.innerHTML = adminInfoHTML(null);
+      }
+    });
+  }
+
   function renderHotspots(rows, source, region){
     clusterGroup.clearLayers();
     currentMarkers = [];
@@ -545,13 +775,12 @@ select option{background:#14161c; color:var(--text);}
       if(isNaN(lat) || isNaN(lon)) return;
       const bucket = confBucket(row, source);
       if(bucket==='low') low++; else if(bucket==='nominal') nominal++; else high++;
-      const color = bucket==='high' ? '#ef4444' : bucket==='nominal' ? '#f2b134' : '#5b8fd9';
       const frp = parseFloat(row.frp);
       const dt = fmtDateTime(row.acq_date, row.acq_time);
+      const adminElId = `admin-${flameSeq++}`;
 
-      const marker = L.circleMarker([lat, lon], {
-        radius: bucket==='high' ? 7 : bucket==='nominal' ? 6 : 5,
-        color, weight:1.5, fillColor:color, fillOpacity:0.55,
+      const marker = L.marker([lat, lon], {
+        icon: flameIcon(bucket),
         confClass: bucket
       });
       marker.bindPopup(
@@ -560,8 +789,14 @@ select option{background:#14161c; color:var(--text);}
          <div class="pop-row"><b>Satelit:</b> ${row.satellite || SOURCE_LABELS[source]}</div>
          ${isNaN(frp) ? '' : `<div class="pop-row"><b>Daya radiasi api (FRP):</b> ${frp.toFixed(1)} MW</div>`}
          <div class="pop-row"><b>Waktu deteksi:</b> ${dt.wibLabel}</div>
-         <div class="pop-row" style="color:#7a8296;">${dt.utcLabel}</div>`
+         <div class="pop-row faint">${dt.utcLabel}</div>
+         <div class="pop-divider"></div>
+         <p class="pop-eyebrow">Lokasi administratif</p>
+         <div id="${adminElId}" class="pop-loading"><span class="pop-spin"></span> Memuat desa/kecamatan…</div>`,
+        { maxWidth:270, minWidth:230 }
       );
+      marker._adminElId = adminElId;
+      wireAdminLookup(marker, lat, lon);
       clusterGroup.addLayer(marker);
       currentMarkers.push({ marker, lat, lon, bucket, dt, row });
     });
@@ -608,19 +843,20 @@ select option{background:#14161c; color:var(--text);}
   }
 
   // ---------- events ----------
+  function hasUsableKey(){ return hasEmbeddedKey || !!mapKeyInput.value.trim(); }
   saveKeyBtn.addEventListener('click', loadHotspots);
   refreshBtn.addEventListener('click', loadHotspots);
   regionSelect.addEventListener('change', ()=>{
     const region = REGIONS[regionSelect.value];
     map.setView(region.center, region.zoom);
-    if(mapKeyInput.value.trim()) loadHotspots();
+    if(hasUsableKey()) loadHotspots();
   });
-  rangeSelect.addEventListener('change', ()=>{ if(mapKeyInput.value.trim()) loadHotspots(); });
-  sourceSelect.addEventListener('change', ()=>{ if(mapKeyInput.value.trim()) loadHotspots(); });
+  rangeSelect.addEventListener('change', ()=>{ if(hasUsableKey()) loadHotspots(); });
+  sourceSelect.addEventListener('change', ()=>{ if(hasUsableKey()) loadHotspots(); });
   mapKeyInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') loadHotspots(); });
 
-  // auto-load if a key was already saved previously
-  if(savedKey){ loadHotspots(); }
+  // auto-load: kunci bawaan selalu langsung dimuat; kalau tidak ada, pakai kunci tersimpan
+  if(hasEmbeddedKey || savedKey){ loadHotspots(); }
 })();
 </script>
 </body>

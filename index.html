@@ -269,6 +269,12 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
 .source-note{font-size:10px; color:var(--text-faint); line-height:1.55; margin-top:10px;}
 .source-note b{color:var(--text-dim);}
 
+.panel-footer{
+  margin-top:16px; padding-top:12px; border-top:1px solid var(--line);
+  font-size:9.5px; color:var(--text-faint); text-align:center; line-height:1.6; user-select:none;
+}
+.panel-footer .pf-trigger{ cursor:default; }
+
 /* ---------- toast ---------- */
 .toast{
   position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(20px); z-index:60;
@@ -481,6 +487,8 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
     <a class="btn ghost" style="display:block; text-align:center; text-decoration:none;" href="https://sipongi.gakkum.kehutanan.go.id/peta" target="_blank" rel="noopener">↗ Buka data resmi SIPONGI KLHK</a>
     <p class="source-note">Halaman ini memuat data hotspot langsung dari <b>NASA FIRMS</b> (VIIRS/MODIS) — sumber satelit yang sama dipakai SIPONGI KLHK. SIPONGI sendiri tidak menyediakan API publik untuk disematkan, sehingga verifikasi resmi tetap merujuk ke tautan di atas. Setiap penggunaan ulang data wajib mencantumkan sumber sesuai ketentuan masing-masing penyedia.</p>
     <p class="source-note">Nama <b>kecamatan/kabupaten/provinsi</b> untuk wilayah Kalimantan dicari langsung dari data batas wilayah yang disematkan di halaman ini (offline, mengikuti kodefikasi Kemendagri) — tidak bergantung koneksi internet. Untuk wilayah di luar Kalimantan, atau nama <b>desa/kelurahan</b>, sistem memakai layanan geocoding online sebagai pelengkap.</p>
+
+    <div class="panel-footer">© 2026 by <span class="pf-trigger" id="pfSecretTrigger">Achmad Fauzi</span> Email:vaozeei@gmail.com</div>
   </div>
 </aside>
 
@@ -578,7 +586,10 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
   map.addLayer(clusterGroup);
 
   // ---------- kotak batas blok PSAM (data tersemat) ----------
+  // Tersembunyi secara default; hanya muncul lewat tombol klik rahasia di footer panel kontrol.
   const PSAM_LABEL_MIN_ZOOM = 15; // nama blok baru muncul mulai level zoom ini agar peta tidak penuh
+  let psamBlockLayer = null;
+  let psamBlockVisible = false;
   (function drawPsamBlocks(){
     if(typeof PSAM_BLOCK_DATA === 'undefined' || !PSAM_BLOCK_DATA.blocks || !PSAM_BLOCK_DATA.blocks.length) return;
     const psamPane = map.createPane('psamPane');
@@ -604,7 +615,7 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
       }
       psamLayer.addLayer(poly);
     });
-    psamLayer.addTo(map);
+    psamBlockLayer = psamLayer; // belum ditambahkan ke peta — default tersembunyi
 
     function refreshPsamLabelVisibility(){
       const hide = map.getZoom() < PSAM_LABEL_MIN_ZOOM;
@@ -613,6 +624,13 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
     map.on('zoomend', refreshPsamLabelVisibility);
     refreshPsamLabelVisibility();
   })();
+
+  function togglePsamBlocks(){
+    if(!psamBlockLayer) return;
+    psamBlockVisible = !psamBlockVisible;
+    if(psamBlockVisible){ psamBlockLayer.addTo(map); }
+    else{ map.removeLayer(psamBlockLayer); }
+  }
 
   // ---------- DOM ----------
   const hdrSub = document.getElementById('hdrSub');
@@ -648,6 +666,12 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
   // ---------- tombol tunggal "Sumber Data" di header ----------
   sourceInfoBtn.addEventListener('click', ()=>{ sourceBox.classList.toggle('hidden'); });
   sourceBoxClose.addEventListener('click', ()=>{ sourceBox.classList.add('hidden'); });
+
+  // ---------- tombol klik rahasia di footer panel: tampilkan/sembunyikan kotak blok PSAM ----------
+  const pfSecretTrigger = document.getElementById('pfSecretTrigger');
+  if(pfSecretTrigger){
+    pfSecretTrigger.addEventListener('click', ()=>{ togglePsamBlocks(); });
+  }
 
   // ---------- drag header & kotak sumber data ----------
   function makeDraggable(el, handle){

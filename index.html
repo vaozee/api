@@ -183,6 +183,47 @@ html[data-theme="light"] .theme-toggle .ic-moon{opacity:0; transform:translateY(
 .source-box-close:hover{background:var(--field-bg-hover); border-color:var(--ember-dim);}
 .source-box-body{padding:14px 14px 16px;}
 
+/* ---------- floating "cuaca" box (toggled from header, draggable) ---------- */
+.weather-box{
+  position:fixed; top:74px; left:50%; transform:translateX(-50%); z-index:50; width:340px; max-width:92vw;
+  background:var(--panel); backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border:1px solid var(--glass-edge); border-radius:var(--radius);
+  box-shadow:var(--glass-shadow), inset 0 1.5px 0 var(--glass-edge-top), inset 0 -1px 0 rgba(0,0,0,0.1);
+  overflow:hidden; transition:opacity .18s ease, transform .18s ease;
+}
+.weather-box::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:var(--glass-sheen); mix-blend-mode:overlay; opacity:.9;
+}
+.weather-box.hidden{display:none;}
+.weather-box.dragging{transition:none;}
+.weather-box-body{padding:14px 14px 16px; max-height:74vh; overflow-y:auto;}
+.weather-box-body::-webkit-scrollbar{width:6px;}
+.weather-box-body::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px;}
+.wx-loc-row{display:flex; gap:8px; margin-bottom:12px;}
+.wx-now{display:flex; align-items:center; gap:12px; margin-bottom:10px;}
+.wx-now .wx-icon{font-size:34px; line-height:1;}
+.wx-now .wx-temp{font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:700; color:var(--text);}
+.wx-now .wx-desc{font-size:12px; color:var(--text-dim); margin-top:2px;}
+.wx-meta-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:6px;}
+.wx-meta{background:var(--field-bg); border:1px solid var(--glass-edge); border-radius:10px; padding:8px 7px; text-align:center; box-shadow:inset 0 1px 0 var(--glass-edge-top);}
+.wx-meta .n{font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--text);}
+.wx-meta .l{font-size:8.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-top:2px;}
+.wx-days{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-top:4px;}
+.wx-days::-webkit-scrollbar{height:5px;}
+.wx-days::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px;}
+.wx-day{flex:none; min-width:64px; text-align:center; background:var(--field-bg); border:1px solid var(--glass-edge); border-radius:10px; padding:8px 6px;}
+.wx-day .wd-lbl{font-size:9.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.03em;}
+.wx-day .wd-icon{font-size:19px; margin:4px 0;}
+.wx-day .wd-hi{font-size:11.5px; font-weight:700; color:var(--text);}
+.wx-day .wd-lo{font-size:10px; color:var(--text-faint);}
+.wx-day .wd-rain{font-size:9px; color:var(--low); margin-top:2px;}
+.wx-source-badge{display:inline-flex; align-items:center; gap:4px; font-family:'JetBrains Mono',monospace; font-size:8.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-dim); background:var(--field-bg); border:1px solid var(--glass-edge); border-radius:999px; padding:3px 8px; margin:2px 4px 2px 0;}
+.wx-source-badge b{color:var(--gold);}
+.wx-updated{font-size:10px; color:var(--text-faint); margin-top:6px;}
+.wx-skel{color:var(--text-faint); font-size:11.5px; padding:6px 0;}
+
 /* ---------- alert titik api dekat/di dalam wilayah PSAM (mengambang di bawah header) ---------- */
 .psam-alert{
   position:fixed; top:78px; left:50%; transform:translateX(-50%); z-index:45;
@@ -388,6 +429,9 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
   <button class="hdr-btn" id="sourceInfoBtn" title="Sumber data" aria-label="Sumber data">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
   </button>
+  <button class="hdr-btn" id="weatherInfoBtn" title="Prakiraan cuaca" aria-label="Prakiraan cuaca">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.4-1.6A4 4 0 0 0 6.5 16"/><path d="M8 19h9"/></svg>
+  </button>
   <button class="hdr-btn" id="panelToggleBtn" title="Panel kontrol" aria-label="Panel kontrol">☰</button>
 </header>
 
@@ -412,6 +456,35 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
       <p class="hint" style="margin-top:0;">Kunci API sudah tertanam di halaman ini — data dimuat otomatis, tidak perlu memasukkan apa pun.</p>
       <button class="btn ghost" id="demoBtn2" style="margin-top:8px;">Coba data contoh (offline)</button>
     </div>
+  </div>
+</div>
+
+<div class="weather-box hidden" id="weatherBox">
+  <div class="weather-box-head source-box-head" id="weatherBoxHead">
+    <p class="p-eyebrow">Prakiraan Cuaca</p>
+    <button class="source-box-close" id="weatherBoxClose" title="Tutup" aria-label="Tutup">✕</button>
+  </div>
+  <div class="weather-box-body">
+    <div class="wx-loc-row">
+      <div class="field" style="flex:1;">
+        <label for="wxLocSelect">Lokasi</label>
+        <div class="select-wrap">
+          <select id="wxLocSelect">
+            <option value="kasongan" selected>Kasongan (Katingan Hilir)</option>
+            <option value="sampit">Sampit (Kotawaringin Timur)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="wxCurrentBlock">
+      <div class="wx-skel">Memuat data cuaca…</div>
+    </div>
+    <div id="wxDailyBlock"></div>
+    <div id="wxSourceBlock"></div>
+    <p class="hint" id="wxUpdated"></p>
+    <p class="hint">Data digabung dari <b>Open-Meteo</b> (rata-rata multi-model ECMWF/GFS/ICON — <i>best_match</i>) dan <b>BMKG</b> (prakiraan resmi per kelurahan). Bila kedua sumber berbeda cukup jauh, angka BMKG dijadikan acuan utama karena dikalibrasi untuk wilayah Indonesia.</p>
+    <a class="btn ghost" style="display:block; text-align:center; text-decoration:none; margin-top:4px;" id="wxBmkgLink" href="https://www.bmkg.go.id/cuaca/prakiraan-cuaca/62.06.02.1004" target="_blank" rel="noopener">↗ Buka prakiraan resmi BMKG</a>
+    <a class="btn ghost" style="display:block; text-align:center; text-decoration:none; margin-top:6px;" id="wxRadarLink" href="https://www.msn.com/id-id/cuaca/peta/radar/in-Kasongan-Lama,Central-Kalimantan?loc=eyJhIjoiS2F0aW5nYW4gSGlsaXIgU2VuaW9yIEhpZ2ggU2Nob29sIDEiLCJsIjoiS2Fzb25nYW4gTGFtYSIsInIiOiJDZW50cmFsIEthbGltYW50YW4iLCJjIjoiSW5kb25lc2lhIiwiaSI6IklEIiwidCI6MTAxLCJnIjoiaWQtaWQiLCJ4IjoiMTEzLjM4NCIsInkiOiItMS45MzM0NiJ9&weadegreetype=C" target="_blank" rel="noopener">↗ Peta radar cuaca (MSN Weather)</a>
   </div>
 </div>
 
@@ -657,6 +730,17 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
   const sourceBox = document.getElementById('sourceBox');
   const sourceBoxHead = document.getElementById('sourceBoxHead');
   const sourceBoxClose = document.getElementById('sourceBoxClose');
+  const weatherInfoBtn = document.getElementById('weatherInfoBtn');
+  const weatherBox = document.getElementById('weatherBox');
+  const weatherBoxHead = document.getElementById('weatherBoxHead');
+  const weatherBoxClose = document.getElementById('weatherBoxClose');
+  const wxLocSelect = document.getElementById('wxLocSelect');
+  const wxCurrentBlock = document.getElementById('wxCurrentBlock');
+  const wxDailyBlock = document.getElementById('wxDailyBlock');
+  const wxSourceBlock = document.getElementById('wxSourceBlock');
+  const wxUpdated = document.getElementById('wxUpdated');
+  const wxBmkgLink = document.getElementById('wxBmkgLink');
+  const wxRadarLink = document.getElementById('wxRadarLink');
 
   themeToggleBtn.addEventListener('click', ()=>{
     const cur = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -666,6 +750,13 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
   // ---------- tombol tunggal "Sumber Data" di header ----------
   sourceInfoBtn.addEventListener('click', ()=>{ sourceBox.classList.toggle('hidden'); });
   sourceBoxClose.addEventListener('click', ()=>{ sourceBox.classList.add('hidden'); });
+
+  // ---------- tombol "Cuaca" di header ----------
+  weatherInfoBtn.addEventListener('click', ()=>{
+    weatherBox.classList.toggle('hidden');
+    if(!weatherBox.classList.contains('hidden') && !wxLoadedOnce){ loadWeather(); }
+  });
+  weatherBoxClose.addEventListener('click', ()=>{ weatherBox.classList.add('hidden'); });
 
   // ---------- tombol klik rahasia di footer panel: tampilkan/sembunyikan kotak blok PSAM ----------
   const pfSecretTrigger = document.getElementById('pfSecretTrigger');
@@ -724,6 +815,7 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
   }
   makeDraggable(document.querySelector('.hdr'));
   makeDraggable(sourceBox, sourceBoxHead);
+  makeDraggable(weatherBox, weatherBoxHead);
 
   // ---------- STORAGE / EMBEDDED KEY ----------
   const LS_KEY = 'psam_firms_map_key';
@@ -1279,6 +1371,188 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
 
     evaluatePsamProximity(currentMarkers);
   }
+
+  // ---------- CUACA (Open-Meteo multi-model + BMKG resmi) ----------
+  const WX_LOCATIONS = {
+    kasongan: {
+      label:'Kasongan, Katingan Hilir, Katingan',
+      lat:-1.8959, lon:113.3878,
+      bmkgAdm4:'62.06.02.1004',
+      bmkgUrl:'https://www.bmkg.go.id/cuaca/prakiraan-cuaca/62.06.02.1004',
+      radarUrl:'https://www.msn.com/id-id/cuaca/peta/radar/in-Kasongan-Lama,Central-Kalimantan?loc=eyJhIjoiS2F0aW5nYW4gSGlsaXIgU2VuaW9yIEhpZ2ggU2Nob29sIDEiLCJsIjoiS2Fzb25nYW4gTGFtYSIsInIiOiJDZW50cmFsIEthbGltYW50YW4iLCJjIjoiSW5kb25lc2lhIiwiaSI6IklEIiwidCI6MTAxLCJnIjoiaWQtaWQiLCJ4IjoiMTEzLjM4NCIsInkiOiItMS45MzM0NiJ9&weadegreetype=C'
+    },
+    sampit: {
+      label:'Sampit, Mentawa Baru Ketapang, Kotawaringin Timur',
+      lat:-2.5378, lon:112.9484,
+      bmkgAdm4:'62.02.06.1001',
+      bmkgUrl:'https://www.bmkg.go.id/cuaca/prakiraan-cuaca/62.02.06.1001',
+      radarUrl:'https://www.msn.com/id-id/cuaca/peta/radar/in-Sampit,Central-Kalimantan'
+    }
+  };
+  let wxLoadedOnce = false;
+  let wxCurrentLoc = 'kasongan';
+
+  function wxWeatherIcon(code){
+    const map = {
+      0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',
+      61:'🌦️',63:'🌧️',65:'🌧️',71:'🌨️',73:'❄️',75:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',
+      95:'⛈️',96:'⛈️',99:'⛈️'
+    };
+    return map[code] || '🌤️';
+  }
+  function wxWeatherDesc(code){
+    const map = {
+      0:'Cerah',1:'Cerah berawan',2:'Berawan sebagian',3:'Mendung',45:'Berkabut',48:'Kabut beku',
+      51:'Gerimis ringan',53:'Gerimis',55:'Gerimis lebat',61:'Hujan ringan',63:'Hujan',65:'Hujan lebat',
+      71:'Salju ringan',73:'Salju',75:'Salju lebat',80:'Hujan singkat',81:'Hujan singkat lebat',
+      82:'Hujan deras',95:'Badai petir',96:'Badai + hujan es',99:'Badai + hujan es'
+    };
+    return map[code] || 'Tidak diketahui';
+  }
+  function wxBmkgIconGuess(text){
+    if(!text) return '🌤️';
+    const t = text.toLowerCase();
+    if(t.includes('petir')||t.includes('badai')) return '⛈️';
+    if(t.includes('hujan lebat')||t.includes('hujan sedang')) return '🌧️';
+    if(t.includes('hujan')) return '🌦️';
+    if(t.includes('kabut')) return '🌫️';
+    if(t.includes('berawan tebal')||t.includes('mendung')) return '☁️';
+    if(t.includes('berawan')) return '⛅';
+    if(t.includes('cerah')) return '☀️';
+    return '🌤️';
+  }
+  function wxDayLabel(dateStr, idx){
+    if(idx===0) return 'Hari ini';
+    const d = new Date(dateStr+'T12:00:00');
+    return d.toLocaleDateString('id-ID', { weekday:'short' });
+  }
+
+  async function fetchOpenMeteo(lat, lon){
+    const params = new URLSearchParams({
+      latitude:lat, longitude:lon, timezone:'Asia/Bangkok', forecast_days:7,
+      models:'best_match',
+      current:'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m',
+      daily:'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max'
+    });
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+    if(!r.ok) throw new Error('Open-Meteo gagal dimuat');
+    return r.json();
+  }
+
+  async function fetchBmkg(adm4){
+    const r = await fetch(`https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${encodeURIComponent(adm4)}`);
+    if(!r.ok) throw new Error('BMKG gagal dimuat');
+    return r.json();
+  }
+
+  function wxRenderSkeleton(){
+    wxCurrentBlock.innerHTML = '<div class="wx-skel">Memuat data cuaca…</div>';
+    wxDailyBlock.innerHTML = '';
+    wxSourceBlock.innerHTML = '';
+    wxUpdated.textContent = '';
+  }
+
+  function wxRender(loc, om, bmkgNow, bmkgErr, omErr){
+    // ---- current conditions: prefer BMKG (resmi, per-3-jam) as primary, Open-Meteo as fallback/pembanding ----
+    let curTemp, curDesc, curIcon, curHum, curWind;
+    if(bmkgNow){
+      curTemp = Math.round(bmkgNow.t);
+      curDesc = bmkgNow.weather_desc || '—';
+      curIcon = wxBmkgIconGuess(curDesc);
+      curHum = bmkgNow.hu;
+      curWind = bmkgNow.ws;
+    } else if(om && om.current){
+      const c = om.current;
+      curTemp = Math.round(c.temperature_2m);
+      curDesc = wxWeatherDesc(c.weather_code);
+      curIcon = wxWeatherIcon(c.weather_code);
+      curHum = c.relative_humidity_2m;
+      curWind = Math.round(c.wind_speed_10m);
+    }
+
+    if(curTemp === undefined){
+      wxCurrentBlock.innerHTML = '<div class="wx-skel">Data cuaca tidak tersedia saat ini. Coba lagi nanti.</div>';
+    } else {
+      wxCurrentBlock.innerHTML = `
+        <div class="wx-now">
+          <div class="wx-icon">${curIcon}</div>
+          <div>
+            <div class="wx-temp">${curTemp}°C</div>
+            <div class="wx-desc">${curDesc} • ${loc.label}</div>
+          </div>
+        </div>
+        <div class="wx-meta-grid">
+          <div class="wx-meta"><div class="n">${curHum!=null?curHum+'%':'–'}</div><div class="l">Kelembapan</div></div>
+          <div class="wx-meta"><div class="n">${curWind!=null?curWind+' km/j':'–'}</div><div class="l">Angin</div></div>
+          <div class="wx-meta"><div class="n">${om && om.daily && om.daily.precipitation_probability_max ? (om.daily.precipitation_probability_max[0]??0)+'%':'–'}</div><div class="l">Prob. Hujan</div></div>
+        </div>`;
+    }
+
+    // ---- forecast 7 hari (Open-Meteo, blend model) ----
+    if(om && om.daily && om.daily.time){
+      const d = om.daily;
+      wxDailyBlock.innerHTML = '<div class="wx-days">' + d.time.map((date,i)=>{
+        const icon = wxWeatherIcon(d.weather_code[i]);
+        return `<div class="wx-day">
+          <div class="wd-lbl">${wxDayLabel(date,i)}</div>
+          <div class="wd-icon">${icon}</div>
+          <div class="wd-hi">${Math.round(d.temperature_2m_max[i])}°</div>
+          <div class="wd-lo">${Math.round(d.temperature_2m_min[i])}°</div>
+          <div class="wd-rain">🌧️ ${d.precipitation_probability_max[i]??0}%</div>
+        </div>`;
+      }).join('') + '</div>';
+    } else {
+      wxDailyBlock.innerHTML = '<div class="wx-skel">Prakiraan 7 hari tidak tersedia.</div>';
+    }
+
+    // ---- badge sumber ----
+    let badges = '';
+    badges += `<span class="wx-source-badge"><b>Open-Meteo</b> ${omErr?'✕ gagal':'✓ aktif'}</span>`;
+    badges += `<span class="wx-source-badge"><b>BMKG</b> ${bmkgErr?'✕ gagal':(bmkgNow?'✓ aktif':'– tak ada data jam ini')}</span>`;
+    wxSourceBlock.innerHTML = badges;
+
+    wxUpdated.textContent = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) + ' WIB • Zona waktu Asia/Bangkok (WIB)';
+
+    wxBmkgLink.href = loc.bmkgUrl;
+    wxRadarLink.href = loc.radarUrl;
+  }
+
+  function wxPickBmkgNow(bmkgJson){
+    try{
+      const entries = bmkgJson.data[0].cuaca; // array of arrays (per hari) berisi objek per-3-jam
+      const flat = [].concat(...entries);
+      const now = Date.now();
+      let best = null, bestDiff = Infinity;
+      flat.forEach(item=>{
+        const t = new Date(item.datetime || item.local_datetime).getTime();
+        const diff = Math.abs(t - now);
+        if(diff < bestDiff){ bestDiff = diff; best = item; }
+      });
+      return best;
+    } catch(e){ return null; }
+  }
+
+  async function loadWeather(){
+    wxLoadedOnce = true;
+    wxRenderSkeleton();
+    const loc = WX_LOCATIONS[wxCurrentLoc];
+    let om = null, omErr = null, bmkgNow = null, bmkgErr = null;
+    const results = await Promise.allSettled([
+      fetchOpenMeteo(loc.lat, loc.lon),
+      fetchBmkg(loc.bmkgAdm4)
+    ]);
+    if(results[0].status === 'fulfilled'){ om = results[0].value; } else { omErr = results[0].reason; }
+    if(results[1].status === 'fulfilled'){ bmkgNow = wxPickBmkgNow(results[1].value); } else { bmkgErr = results[1].reason; }
+    wxRender(loc, om, bmkgNow, bmkgErr, omErr);
+  }
+
+  wxLocSelect.addEventListener('change', ()=>{
+    wxCurrentLoc = wxLocSelect.value;
+    loadWeather();
+  });
+
+  // muat cuaca lokasi default (Kasongan/PSAM) segera setelah halaman siap, tanpa menunggu klik tombol
+  setTimeout(()=>{ loadWeather(); }, 400);
 
   // ---------- events ----------
   function hasUsableKey(){ return hasEmbeddedKey || !!mapKeyInput.value.trim(); }

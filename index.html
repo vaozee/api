@@ -86,6 +86,11 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; backgro
   font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; transition:background .2s ease, color .2s ease;}
 #map{position:fixed; inset:0; z-index:1; background:#0a0c10;}
 .leaflet-tile-pane{filter:var(--tile-filter);}
+#wxSkyCanvas{
+  position:fixed; inset:0; z-index:6; pointer-events:none;
+  opacity:0; transition:opacity .5s ease;
+}
+#wxSkyCanvas.active{opacity:1;}
 
 /* ---------- floating capsule header ---------- */
 .hdr{
@@ -213,7 +218,9 @@ html[data-theme="light"] .theme-toggle .ic-moon{opacity:0; transform:translateY(
 .wx-days{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-top:4px;}
 .wx-days::-webkit-scrollbar{height:5px;}
 .wx-days::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px;}
-.wx-day{flex:none; min-width:64px; text-align:center; background:var(--field-bg); border:1px solid var(--glass-edge); border-radius:10px; padding:8px 6px;}
+.wx-day{flex:none; min-width:64px; text-align:center; background:var(--field-bg); border:1px solid var(--glass-edge); border-radius:10px; padding:8px 6px; cursor:pointer; transition:background .15s, border-color .15s, transform .15s; user-select:none;}
+.wx-day:hover{background:var(--field-bg-hover); transform:translateY(-1px);}
+.wx-day.selected{background:var(--field-bg-hover); border-color:var(--ember-dim); box-shadow:inset 0 0 0 1px var(--ember-dim);}
 .wx-day .wd-lbl{font-size:9.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.03em;}
 .wx-day .wd-icon{font-size:19px; margin:4px 0;}
 .wx-day .wd-hi{font-size:11.5px; font-weight:700; color:var(--text);}
@@ -412,6 +419,7 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
 <body>
 
 <div id="map"></div>
+<canvas id="wxSkyCanvas" aria-hidden="true"></canvas>
 
 <header class="hdr">
   <span class="dot"></span>
@@ -470,7 +478,8 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
         <label for="wxLocSelect">Lokasi</label>
         <div class="select-wrap">
           <select id="wxLocSelect">
-            <option value="kasongan" selected>Kasongan (Katingan Hilir)</option>
+            <option value="rantaubangkiang" selected>Rantau Bangkiang (Sanaman Mantikei)</option>
+            <option value="kasongan">Kasongan (Katingan Hilir)</option>
             <option value="sampit">Sampit (Kotawaringin Timur)</option>
           </select>
         </div>
@@ -483,8 +492,8 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
     <div id="wxSourceBlock"></div>
     <p class="hint" id="wxUpdated"></p>
     <p class="hint">Data digabung dari <b>Open-Meteo</b> (rata-rata multi-model ECMWF/GFS/ICON — <i>best_match</i>) dan <b>BMKG</b> (prakiraan resmi per kelurahan). Bila kedua sumber berbeda cukup jauh, angka BMKG dijadikan acuan utama karena dikalibrasi untuk wilayah Indonesia.</p>
-    <a class="btn ghost" style="display:block; text-align:center; text-decoration:none; margin-top:4px;" id="wxBmkgLink" href="https://www.bmkg.go.id/cuaca/prakiraan-cuaca/62.06.02.1004" target="_blank" rel="noopener">↗ Buka prakiraan resmi BMKG</a>
-    <a class="btn ghost" style="display:block; text-align:center; text-decoration:none; margin-top:6px;" id="wxRadarLink" href="https://www.msn.com/id-id/cuaca/peta/radar/in-Kasongan-Lama,Central-Kalimantan?loc=eyJhIjoiS2F0aW5nYW4gSGlsaXIgU2VuaW9yIEhpZ2ggU2Nob29sIDEiLCJsIjoiS2Fzb25nYW4gTGFtYSIsInIiOiJDZW50cmFsIEthbGltYW50YW4iLCJjIjoiSW5kb25lc2lhIiwiaSI6IklEIiwidCI6MTAxLCJnIjoiaWQtaWQiLCJ4IjoiMTEzLjM4NCIsInkiOiItMS45MzM0NiJ9&weadegreetype=C" target="_blank" rel="noopener">↗ Peta radar cuaca (MSN Weather)</a>
+    <a class="btn ghost" style="display:block; text-align:center; text-decoration:none; margin-top:4px;" id="wxBmkgLink" href="https://www.bmkg.go.id/cuaca/prakiraan-cuaca/62.06.06.2021" target="_blank" rel="noopener">↗ Buka prakiraan resmi BMKG</a>
+    <a class="btn ghost" style="display:block; text-align:center; text-decoration:none; margin-top:6px;" id="wxRadarLink" href="https://www.msn.com/id-id/cuaca/peta/radar/in-Rantau-Bangkiang,Central-Kalimantan" target="_blank" rel="noopener">↗ Peta radar cuaca (MSN Weather)</a>
   </div>
 </div>
 
@@ -741,6 +750,7 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
   const wxUpdated = document.getElementById('wxUpdated');
   const wxBmkgLink = document.getElementById('wxBmkgLink');
   const wxRadarLink = document.getElementById('wxRadarLink');
+  const wxSkyCanvas = document.getElementById('wxSkyCanvas');
 
   themeToggleBtn.addEventListener('click', ()=>{
     const cur = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -754,9 +764,14 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
   // ---------- tombol "Cuaca" di header ----------
   weatherInfoBtn.addEventListener('click', ()=>{
     weatherBox.classList.toggle('hidden');
-    if(!weatherBox.classList.contains('hidden') && !wxLoadedOnce){ loadWeather(); }
+    if(!weatherBox.classList.contains('hidden')){
+      if(!wxLoadedOnce){ loadWeather(); }
+      wxSky.start();
+    } else {
+      wxSky.stop();
+    }
   });
-  weatherBoxClose.addEventListener('click', ()=>{ weatherBox.classList.add('hidden'); });
+  weatherBoxClose.addEventListener('click', ()=>{ weatherBox.classList.add('hidden'); wxSky.stop(); });
 
   // ---------- tombol klik rahasia di footer panel: tampilkan/sembunyikan kotak blok PSAM ----------
   const pfSecretTrigger = document.getElementById('pfSecretTrigger');
@@ -1374,6 +1389,13 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
 
   // ---------- CUACA (Open-Meteo multi-model + BMKG resmi) ----------
   const WX_LOCATIONS = {
+    rantaubangkiang: {
+      label:'Rantau Bangkiang, Sanaman Mantikei, Katingan',
+      lat:-1.3585225, lon:113.1381998,
+      bmkgAdm4:'62.06.06.2021',
+      bmkgUrl:'https://www.bmkg.go.id/cuaca/prakiraan-cuaca/62.06.06.2021',
+      radarUrl:'https://www.msn.com/id-id/cuaca/peta/radar/in-Rantau-Bangkiang,Central-Kalimantan'
+    },
     kasongan: {
       label:'Kasongan, Katingan Hilir, Katingan',
       lat:-1.8959, lon:113.3878,
@@ -1390,7 +1412,173 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
     }
   };
   let wxLoadedOnce = false;
-  let wxCurrentLoc = 'kasongan';
+  let wxCurrentLoc = 'rantaubangkiang';
+
+  // ---------- animasi awan & titik hujan bergerak di atas peta (mirip MSN Weather) ----------
+  const wxSky = (function(){
+    const canvas = wxSkyCanvas;
+    const ctx = canvas.getContext('2d');
+    let running = false, rafId = null, dpr = 1;
+    let W = 0, H = 0;
+    let clouds = [];
+    let drops = [];
+    let rainLevel = 0; // 0 = tak hujan, 1 = gerimis, 2 = hujan, 3 = hujan lebat/badai
+
+    function resize(){
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+
+    function makeClouds(n){
+      const arr = [];
+      for(let i=0; i<n; i++){
+        const scale = 0.6 + Math.random()*1.1;
+        arr.push({
+          x: Math.random()*W,
+          y: H*0.06 + Math.random()*H*0.42,
+          scale,
+          speed: (8 + Math.random()*16) * (0.6 + scale*0.4),
+          puff: 60 + Math.random()*70,
+          alpha: 0.16 + Math.random()*0.22
+        });
+      }
+      return arr;
+    }
+    function makeDrops(n){
+      const arr = [];
+      for(let i=0; i<n; i++){
+        arr.push({
+          x: Math.random()*W,
+          y: Math.random()*H,
+          len: 14 + Math.random()*20,
+          speed: 340 + Math.random()*260,
+          drift: 55,
+          alpha: 0.45 + Math.random()*0.4
+        });
+      }
+      return arr;
+    }
+
+    function drawCloud(c){
+      const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.puff*c.scale*2.2);
+      g.addColorStop(0, `rgba(240,244,250,${Math.min(c.alpha*1.7, 0.6)})`);
+      g.addColorStop(0.6, `rgba(220,228,238,${c.alpha*0.9})`);
+      g.addColorStop(1, 'rgba(220,228,238,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, c.puff*c.scale*2.2, c.puff*c.scale*1.1, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    function drawDrop(d){
+      ctx.strokeStyle = `rgba(214,232,255,${d.alpha})`;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = 'rgba(120,170,255,0.9)';
+      ctx.shadowBlur = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x - d.drift*0.12, d.y + d.len);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    let lastT = null;
+    let washAlpha = 0;
+    let flashAlpha = 0;
+    function frame(t){
+      if(!running) return;
+      if(lastT === null) lastT = t;
+      const dt = Math.min((t - lastT)/1000, 0.05);
+      lastT = t;
+      ctx.clearRect(0, 0, W, H);
+
+      // rona atmosfer gelap saat mendung/hujan, memastikan animasi tetap terlihat di atas citra apa pun
+      const washTarget = rainLevel===0 ? 0 : rainLevel===1 ? 0.08 : rainLevel===2 ? 0.16 : 0.26;
+      washAlpha += (washTarget - washAlpha) * Math.min(dt*2.2, 1);
+      if(washAlpha > 0.003){
+        const wg = ctx.createLinearGradient(0, 0, 0, H);
+        wg.addColorStop(0, `rgba(12,16,30,${washAlpha})`);
+        wg.addColorStop(1, `rgba(12,16,30,${washAlpha*0.55})`);
+        ctx.fillStyle = wg;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      clouds.forEach(c=>{
+        c.x += c.speed*dt;
+        if(c.x - c.puff*c.scale*2.5 > W) c.x = -c.puff*c.scale*2.5;
+        drawCloud(c);
+      });
+
+      if(rainLevel > 0){
+        drops.forEach(d=>{
+          d.y += d.speed*dt;
+          d.x += d.drift*dt;
+          if(d.y > H){ d.y = -20; d.x = Math.random()*W; }
+          drawDrop(d);
+        });
+      }
+
+      // kilatan petir untuk kondisi badai
+      if(rainLevel >= 3){
+        if(Math.random() < 0.006) flashAlpha = 0.5 + Math.random()*0.3;
+      }
+      if(flashAlpha > 0.003){
+        ctx.fillStyle = `rgba(230,238,255,${flashAlpha})`;
+        ctx.fillRect(0, 0, W, H);
+        flashAlpha *= 0.86;
+      } else {
+        flashAlpha = 0;
+      }
+
+      rafId = requestAnimationFrame(frame);
+    }
+
+    function setIntensity(level){
+      rainLevel = Math.max(0, Math.min(3, level|0));
+      const target = rainLevel===0 ? 0 : rainLevel===1 ? 90 : rainLevel===2 ? 220 : 380;
+      drops = makeDrops(target);
+    }
+
+    function start(){
+      if(running) return;
+      running = true;
+      resize();
+      if(clouds.length===0) clouds = makeClouds(6);
+      if(drops.length===0) drops = makeDrops(0);
+      lastT = null;
+      canvas.classList.add('active');
+      rafId = requestAnimationFrame(frame);
+    }
+    function stop(){
+      running = false;
+      canvas.classList.remove('active');
+      if(rafId) cancelAnimationFrame(rafId);
+      ctx.clearRect(0, 0, W, H);
+    }
+
+    return { start, stop, setIntensity };
+  })();
+
+  // Perkirakan intensitas hujan dari kode cuaca Open-Meteo / deskripsi BMKG
+  function wxRainLevelFromCode(code){
+    if(code==null) return 0;
+    if([51,53,61,80].includes(code)) return 1;       // gerimis / hujan ringan
+    if([55,63,65,81].includes(code)) return 2;       // hujan / hujan sedang-lebat
+    if([82,95,96,99].includes(code)) return 3;       // hujan deras / badai petir
+    return 0;
+  }
+  function wxRainLevelFromDesc(desc){
+    if(!desc) return 0;
+    const t = desc.toLowerCase();
+    if(t.includes('petir') || t.includes('badai') || t.includes('deras')) return 3;
+    if(t.includes('hujan lebat') || t.includes('hujan sedang')) return 2;
+    if(t.includes('hujan') || t.includes('gerimis')) return 1;
+    return 0;
+  }
 
   function wxWeatherIcon(code){
     const map = {
@@ -1493,7 +1681,7 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
       const d = om.daily;
       wxDailyBlock.innerHTML = '<div class="wx-days">' + d.time.map((date,i)=>{
         const icon = wxWeatherIcon(d.weather_code[i]);
-        return `<div class="wx-day">
+        return `<div class="wx-day${i===0?' selected':''}" data-idx="${i}" data-code="${d.weather_code[i]}" data-day="${wxDayLabel(date,i)}" data-desc="${wxWeatherDesc(d.weather_code[i])}" tabindex="0" role="button" aria-label="Pratinjau animasi cuaca ${wxDayLabel(date,i)}">
           <div class="wd-lbl">${wxDayLabel(date,i)}</div>
           <div class="wd-icon">${icon}</div>
           <div class="wd-hi">${Math.round(d.temperature_2m_max[i])}°</div>
@@ -1501,6 +1689,19 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
           <div class="wd-rain">🌧️ ${d.precipitation_probability_max[i]??0}%</div>
         </div>`;
       }).join('') + '</div>';
+
+      wxDailyBlock.querySelectorAll('.wx-day').forEach(card=>{
+        const activate = ()=>{
+          wxDailyBlock.querySelectorAll('.wx-day').forEach(c=>c.classList.remove('selected'));
+          card.classList.add('selected');
+          const code = parseInt(card.dataset.code, 10);
+          wxSky.start();
+          wxSky.setIntensity(wxRainLevelFromCode(code));
+          wxUpdated.textContent = `Pratinjau animasi: ${card.dataset.day} · ${card.dataset.desc}`;
+        };
+        card.addEventListener('click', activate);
+        card.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); activate(); } });
+      });
     } else {
       wxDailyBlock.innerHTML = '<div class="wx-skel">Prakiraan 7 hari tidak tersedia.</div>';
     }
@@ -1515,6 +1716,15 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
 
     wxBmkgLink.href = loc.bmkgUrl;
     wxRadarLink.href = loc.radarUrl;
+
+    // ---- sinkronkan animasi awan & hujan di atas peta dengan kondisi cuaca saat ini ----
+    let rainLevel = 0;
+    if(bmkgNow){
+      rainLevel = wxRainLevelFromDesc(curDesc);
+    } else if(om && om.current){
+      rainLevel = wxRainLevelFromCode(om.current.weather_code);
+    }
+    wxSky.setIntensity(rainLevel);
   }
 
   function wxPickBmkgNow(bmkgJson){
@@ -1551,7 +1761,7 @@ window.PSAM_BLOCK_DATA = {"bbox":[112.921805,-1.422114,113.094252,-1.172906],"bl
     loadWeather();
   });
 
-  // muat cuaca lokasi default (Kasongan/PSAM) segera setelah halaman siap, tanpa menunggu klik tombol
+  // muat cuaca lokasi default (Rantau Bangkiang/PSAM) segera setelah halaman siap, tanpa menunggu klik tombol
   setTimeout(()=>{ loadWeather(); }, 400);
 
   // ---------- events ----------

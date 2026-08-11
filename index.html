@@ -1098,6 +1098,54 @@ window.PEAK_BLOCK_DATA = {"bbox":[113.213966,-2.956034,113.324315,-2.523763],"bl
     return null;
   }
 
+  // ---------- suara peringatan otomatis (Web Speech API) ----------
+  const SPEECH_LANG = 'id-ID';
+  let cachedIdVoice = null;
+  function getIdVoice(){
+    if(!window.speechSynthesis) return null;
+    if(cachedIdVoice) return cachedIdVoice;
+    const voices = window.speechSynthesis.getVoices();
+    cachedIdVoice = voices.find(v=> v.lang && v.lang.toLowerCase().startsWith('id')) || null;
+    return cachedIdVoice;
+  }
+  if(window.speechSynthesis){
+    window.speechSynthesis.onvoiceschanged = ()=>{ cachedIdVoice = null; getIdVoice(); };
+  }
+  function speakNow(text){
+    if(!window.speechSynthesis || !text) return;
+    try{
+      window.speechSynthesis.cancel(); // hentikan antrean lama agar suara tidak menumpuk
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = SPEECH_LANG;
+      const v = getIdVoice();
+      if(v) utter.voice = v;
+      utter.rate = 1; utter.pitch = 1;
+      window.speechSynthesis.speak(utter);
+    }catch(e){ /* abaikan bila text-to-speech tidak didukung peramban */ }
+  }
+  let pendingSpeechText = null;
+  function speakAlert(text){
+    pendingSpeechText = text;
+    speakNow(text);
+  }
+  // sebagian peramban (mis. Chrome/Safari) memblokir audio otomatis sebelum ada interaksi pengguna —
+  // coba ulang sekali saat interaksi pertama agar peringatan tetap terbaca.
+  function retrySpeechOnInteraction(){
+    if(pendingSpeechText) speakNow(pendingSpeechText);
+  }
+  ['click','touchstart','keydown'].forEach(evt=> window.addEventListener(evt, retrySpeechOnInteraction, { once:true }));
+  function fmtDistSpeech(m){
+    return m < 1000 ? `${Math.round(m)} meter` : `${(m/1000).toFixed(1).replace('.', ',')} km`;
+  }
+  function buildAlertSpeechText(label, insideCount, nearCount, minNear){
+    const bagian = [];
+    if(insideCount>0) bagian.push(`ada ${insideCount} titik api di dalam wilayah ${label}`);
+    if(nearCount>0) bagian.push(`ada ${nearCount} titik api sekitar ${fmtDistSpeech(minNear)} dari wilayah ${label}`);
+    if(!bagian.length) return '';
+    return `Peringatan! ${bagian.join(', dan ')}, terima kasih.`;
+  }
+  let psamLastSpeech = null, peakLastSpeech = null;
+
   // ---------- deteksi kedekatan titik api thd batas blok PSAM (data tersemat, tidak digambar di peta) ----------
   const psamAlert = document.getElementById('psamAlert');
   const psamAlertBody = document.getElementById('psamAlertBody');
@@ -1198,6 +1246,7 @@ window.PEAK_BLOCK_DATA = {"bbox":[113.213966,-2.956034,113.324315,-2.523763],"bl
 
     if(insideCount===0 && nearCount===0){
       psamAlert.classList.add('hidden');
+      psamLastSpeech = null;
       layoutAlerts();
       return;
     }
@@ -1214,6 +1263,11 @@ window.PEAK_BLOCK_DATA = {"bbox":[113.213966,-2.956034,113.324315,-2.523763],"bl
     psamAlert.classList.add('clickable');
     const target = insideMarker || nearMarker;
     if(target){ psamAlert.dataset.lat = target.lat; psamAlert.dataset.lon = target.lon; }
+    const psamSpeechText = buildAlertSpeechText('psam', insideCount, nearCount, minNear);
+    if(psamSpeechText && psamSpeechText !== psamLastSpeech){
+      psamLastSpeech = psamSpeechText;
+      speakAlert(psamSpeechText);
+    }
     layoutAlerts();
   }
   if(psamAlertClose) psamAlertClose.addEventListener('click', (e)=>{ e.stopPropagation(); psamAlert.classList.add('hidden'); layoutAlerts(); });
@@ -1275,6 +1329,7 @@ window.PEAK_BLOCK_DATA = {"bbox":[113.213966,-2.956034,113.324315,-2.523763],"bl
 
     if(insideCount===0 && nearCount===0){
       peakAlert.classList.add('hidden');
+      peakLastSpeech = null;
       layoutAlerts();
       return;
     }
@@ -1291,6 +1346,11 @@ window.PEAK_BLOCK_DATA = {"bbox":[113.213966,-2.956034,113.324315,-2.523763],"bl
     peakAlert.classList.add('clickable');
     const target = insideMarker || nearMarker;
     if(target){ peakAlert.dataset.lat = target.lat; peakAlert.dataset.lon = target.lon; }
+    const peakSpeechText = buildAlertSpeechText('peak', insideCount, nearCount, minNear);
+    if(peakSpeechText && peakSpeechText !== peakLastSpeech){
+      peakLastSpeech = peakSpeechText;
+      speakAlert(peakSpeechText);
+    }
     layoutAlerts();
   }
   if(peakAlertClose) peakAlertClose.addEventListener('click', (e)=>{ e.stopPropagation(); peakAlert.classList.add('hidden'); layoutAlerts(); });

@@ -216,9 +216,10 @@ html[data-theme="light"] .theme-toggle .ic-moon{opacity:0; transform:translateY(
   transition:background .15s;
 }
 .psam-alert .pa-close:hover{background:rgba(239,68,68,0.26);}
-.psam-alert.clickable{cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;}
-.psam-alert.clickable:hover{transform:translate(-50%,-1px); box-shadow:var(--glass-shadow), 0 0 0 1px rgba(239,68,68,0.35), inset 0 1.5px 0 var(--glass-edge-top);}
-.psam-alert.clickable:active{transform:translate(-50%,0);}
+.psam-alert.clickable{cursor:grab; transition:transform .12s ease, box-shadow .12s ease;}
+.psam-alert.clickable:hover{box-shadow:var(--glass-shadow), 0 0 0 1px rgba(239,68,68,0.35), inset 0 1.5px 0 var(--glass-edge-top);}
+.psam-alert.clickable:active{cursor:grabbing;}
+.psam-alert.dragging{transition:none; cursor:grabbing;}
 @keyframes psamAlertIn{ from{opacity:0; transform:translate(-50%,-8px);} to{opacity:1; transform:translate(-50%,0);} }
 /* kontras lebih kuat di tema terang supaya alert tidak "kurang nampak" */
 html[data-theme="light"] .psam-alert, html[data-theme="light"] .peak-alert{
@@ -259,9 +260,10 @@ html[data-theme="light"] .psam-alert.clickable:hover, html[data-theme="light"] .
   transition:background .15s;
 }
 .peak-alert .pa-close:hover{background:rgba(239,68,68,0.26);}
-.peak-alert.clickable{cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;}
-.peak-alert.clickable:hover{transform:translate(-50%,-1px); box-shadow:var(--glass-shadow), 0 0 0 1px rgba(239,68,68,0.35), inset 0 1.5px 0 var(--glass-edge-top);}
-.peak-alert.clickable:active{transform:translate(-50%,0);}
+.peak-alert.clickable{cursor:grab; transition:transform .12s ease, box-shadow .12s ease;}
+.peak-alert.clickable:hover{box-shadow:var(--glass-shadow), 0 0 0 1px rgba(239,68,68,0.35), inset 0 1.5px 0 var(--glass-edge-top);}
+.peak-alert.clickable:active{cursor:grabbing;}
+.peak-alert.dragging{transition:none; cursor:grabbing;}
 
 /* ---------- alert titik api dekat/di dalam wilayah WCJU (mengambang di bawah alert PEAK) ---------- */
 .wcju-alert{
@@ -288,9 +290,10 @@ html[data-theme="light"] .psam-alert.clickable:hover, html[data-theme="light"] .
   transition:background .15s;
 }
 .wcju-alert .pa-close:hover{background:rgba(239,68,68,0.26);}
-.wcju-alert.clickable{cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;}
-.wcju-alert.clickable:hover{transform:translate(-50%,-1px); box-shadow:var(--glass-shadow), 0 0 0 1px rgba(239,68,68,0.35), inset 0 1.5px 0 var(--glass-edge-top);}
-.wcju-alert.clickable:active{transform:translate(-50%,0);}
+.wcju-alert.clickable{cursor:grab; transition:transform .12s ease, box-shadow .12s ease;}
+.wcju-alert.clickable:hover{box-shadow:var(--glass-shadow), 0 0 0 1px rgba(239,68,68,0.35), inset 0 1.5px 0 var(--glass-edge-top);}
+.wcju-alert.clickable:active{cursor:grabbing;}
+.wcju-alert.dragging{transition:none; cursor:grabbing;}
 html[data-theme="light"] .wcju-alert{
   background:linear-gradient(135deg, rgba(201,47,47,0.22), rgba(201,47,47,0.10));
   border:1px solid rgba(201,47,47,0.55);
@@ -333,9 +336,10 @@ html[data-theme="light"] .wcju-alert.clickable:hover{box-shadow:0 14px 34px rgba
   transition:background .15s;
 }
 .kpp-alert .pa-close:hover{background:rgba(239,68,68,0.26);}
-.kpp-alert.clickable{cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;}
-.kpp-alert.clickable:hover{transform:translate(-50%,-1px); box-shadow:var(--glass-shadow), 0 0 0 1px rgba(239,68,68,0.35), inset 0 1.5px 0 var(--glass-edge-top);}
-.kpp-alert.clickable:active{transform:translate(-50%,0);}
+.kpp-alert.clickable{cursor:grab; transition:transform .12s ease, box-shadow .12s ease;}
+.kpp-alert.clickable:hover{box-shadow:var(--glass-shadow), 0 0 0 1px rgba(239,68,68,0.35), inset 0 1.5px 0 var(--glass-edge-top);}
+.kpp-alert.clickable:active{cursor:grabbing;}
+.kpp-alert.dragging{transition:none; cursor:grabbing;}
 html[data-theme="light"] .kpp-alert{
   background:linear-gradient(135deg, rgba(201,47,47,0.22), rgba(201,47,47,0.10));
   border:1px solid rgba(201,47,47,0.55);
@@ -1384,6 +1388,7 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
 
   // ---------- deteksi kedekatan titik api thd batas blok PSAM (data tersemat, tidak digambar di peta) ----------
   const psamAlert = document.getElementById('psamAlert');
+  makeDraggable(psamAlert); // alert bisa digeser bebas; klik singkat tanpa geser tetap fly-to lokasi
   const psamAlertBody = document.getElementById('psamAlertBody');
   const psamAlertClose = document.getElementById('psamAlertClose');
   const PSAM_NEAR_M = 3000; // ambang "dekat" wilayah PSAM (meter) — ubah di sini bila perlu
@@ -1510,6 +1515,7 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
 
   // ---------- deteksi kedekatan titik api thd batas blok PEAK (data tersemat, tidak digambar di peta) ----------
   const peakAlert = document.getElementById('peakAlert');
+  makeDraggable(peakAlert);
   const peakAlertBody = document.getElementById('peakAlertBody');
   const peakAlertClose = document.getElementById('peakAlertClose');
   const PEAK_NEAR_M = 3000; // ambang "dekat" wilayah PEAK (meter)
@@ -1643,6 +1649,7 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
 
   // ---------- deteksi kedekatan titik api thd batas blok WCJU (data tersemat, tidak digambar di peta) ----------
   const wcjuAlert = document.getElementById('wcjuAlert');
+  makeDraggable(wcjuAlert);
   const wcjuAlertBody = document.getElementById('wcjuAlertBody');
   const wcjuAlertClose = document.getElementById('wcjuAlertClose');
   const WCJU_NEAR_M = 3000; // ambang "dekat" wilayah WCJU (meter)
@@ -1776,6 +1783,7 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
 
   // ---------- deteksi kedekatan titik api thd batas blok PT KPP (data tersemat, tidak digambar di peta) ----------
   const kppAlert = document.getElementById('kppAlert');
+  makeDraggable(kppAlert);
   const kppAlertBody = document.getElementById('kppAlertBody');
   const kppAlertClose = document.getElementById('kppAlertClose');
   const KPP_NEAR_M = 3000; // ambang "dekat" wilayah PT KPP (meter)

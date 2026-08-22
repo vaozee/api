@@ -449,6 +449,32 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
 .leaflet-popup-tip{background:var(--popup-bg); backdrop-filter:blur(var(--glass-blur));}
 .pop-title{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12.5px; margin-bottom:7px; color:var(--popup-text);}
 .leaflet-popup-close-button{color:var(--popup-text-dim) !important;}
+/* Kontrol layer (pemilih basemap) - kaca transparan, tanpa kotak putih solid */
+.leaflet-control-layers{
+  background:var(--panel) !important;
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border:1px solid var(--glass-edge);
+  border-radius:var(--radius);
+  box-shadow:var(--glass-shadow);
+  color:var(--text);
+}
+.leaflet-control-layers-toggle{
+  background-color:var(--panel) !important;
+  border-radius:var(--radius);
+  opacity:1;
+}
+.leaflet-control-layers-expanded{
+  background:var(--panel) !important;
+  color:var(--text);
+  padding:10px 12px;
+}
+.leaflet-control-layers label{ color:var(--text); font-size:12.5px; }
+.leaflet-control-layers-separator{ border-top:1px solid var(--line); }
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar{
+  border:1px solid var(--glass-edge) !important;
+}
 .pop-table{width:100%; border-collapse:collapse; font-size:11.5px;}
 .pop-table td{padding:6px 8px; vertical-align:top; line-height:1.4;}
 .pop-table tr:nth-child(odd) td{background:var(--field-bg);}
@@ -742,26 +768,111 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
     localStorage.setItem(THEME_KEY, t);
   }
 
-  // ---------- MAP BASEMAP: citra satelit terkini (Esri World Imagery) + label/batas wilayah ----------
-  function buildImageryLayer(){
-    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics, GIS User Community',
-      maxZoom:19
+  // ---------- MAP BASEMAP: citra satelit resolusi tinggi & terkini, zoom hingga level 21 ----------
+  const MAP_MAX_ZOOM = 21;
+  function buildGoogleSatLayer(){
+    // Google Satellite: update citra lebih sering & tetap tajam hingga zoom tinggi (oversampled otomatis oleh server Google jika native tile habis)
+    return L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      subdomains:['mt0','mt1','mt2','mt3'],
+      attribution:'Imagery &copy; Google',
+      maxZoom:MAP_MAX_ZOOM,
+      maxNativeZoom:21
     });
   }
-  function buildLabelsLayer(){
+  function buildGoogleHybridLabelsLayer(){
+    // Layer label jalan/nama tempat dari Google (hybrid), ditumpuk di atas citra satelit
+    return L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&scale=2', {
+      subdomains:['mt0','mt1','mt2','mt3'],
+      maxZoom:MAP_MAX_ZOOM,
+      maxNativeZoom:21,
+      pane:'labelsPane',
+      opacity:1
+    });
+  }
+  function buildEsriSatLayer(){
+    // Alternatif: Esri World Imagery (Maxar) - kualitas sangat baik, native hingga zoom 19-20 lalu di-oversample
+    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics, GIS User Community',
+      maxZoom:MAP_MAX_ZOOM,
+      maxNativeZoom:20
+    });
+  }
+  function buildEsriLabelsLayer(){
     return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom:19, pane:'labelsPane'
+      maxZoom:MAP_MAX_ZOOM, maxNativeZoom:19, pane:'labelsPane'
+    });
+  }
+  function buildOsmLayer(){
+    // Alternatif non-satelit: peta jalan standar OpenStreetMap
+    return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      subdomains:['a','b','c'],
+      attribution:'&copy; OpenStreetMap contributors',
+      maxZoom:MAP_MAX_ZOOM,
+      maxNativeZoom:19
+    });
+  }
+  function buildEsriTopoLayer(){
+    // Alternatif: peta topografi Esri (kontur, elevasi, jaringan sungai lebih jelas)
+    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+      attribution:'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+      maxZoom:MAP_MAX_ZOOM,
+      maxNativeZoom:19
+    });
+  }
+  function buildEsriTerrainLayer(){
+    // Alternatif: citra + relief bayangan (shaded relief), bagus untuk membaca topografi kebun
+    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', {
+      attribution:'Tiles &copy; Esri &mdash; Esri, USGS, TANA, DeLorme, NAVTEQ',
+      maxZoom:MAP_MAX_ZOOM,
+      maxNativeZoom:13
     });
   }
 
   // ---------- MAP ----------
-  const map = L.map('map', { zoomControl:false, attributionControl:true }).setView(REGIONS.kalteng.center, REGIONS.kalteng.zoom);
+  const map = L.map('map', { zoomControl:false, attributionControl:true, maxZoom:MAP_MAX_ZOOM }).setView(REGIONS.kalteng.center, REGIONS.kalteng.zoom);
   L.control.zoom({ position:'bottomright' }).addTo(map);
   map.createPane('labelsPane');
   map.getPane('labelsPane').style.zIndex = 350; // above imagery, below markers
-  buildImageryLayer().addTo(map);
-  buildLabelsLayer().addTo(map);
+
+  const googleSatLayer = buildGoogleSatLayer();
+  const googleLabelsLayer = buildGoogleHybridLabelsLayer();
+  const esriSatLayer = buildEsriSatLayer();
+  const esriLabelsLayer = buildEsriLabelsLayer();
+  const osmLayer = buildOsmLayer();
+  const esriTopoLayer = buildEsriTopoLayer();
+  const esriTerrainLayer = buildEsriTerrainLayer();
+
+  // Default: Google Satellite (citra umumnya lebih baru & tajam hingga zoom tinggi untuk wilayah Indonesia)
+  googleSatLayer.addTo(map);
+  googleLabelsLayer.addTo(map);
+
+  const baseLayers = {
+    'Google Satellite (terkini)': googleSatLayer,
+    'Esri World Imagery': esriSatLayer,
+    'Esri Topografi': esriTopoLayer,
+    'Esri Relief Bayangan': esriTerrainLayer,
+    'OpenStreetMap': osmLayer
+  };
+  L.control.layers(baseLayers, {
+    'Label Google': googleLabelsLayer,
+    'Label Esri': esriLabelsLayer
+  }, { position:'bottomleft', collapsed:true }).addTo(map);
+
+  // Saat ganti basemap, pastikan hanya satu layer label satelit aktif agar tidak tumpang tindih
+  map.on('baselayerchange', function(e){
+    if(e.layer === googleSatLayer){
+      if(!map.hasLayer(googleLabelsLayer)) map.addLayer(googleLabelsLayer);
+      if(map.hasLayer(esriLabelsLayer)) map.removeLayer(esriLabelsLayer);
+    } else if(e.layer === esriSatLayer){
+      if(!map.hasLayer(esriLabelsLayer)) map.addLayer(esriLabelsLayer);
+      if(map.hasLayer(googleLabelsLayer)) map.removeLayer(googleLabelsLayer);
+    } else {
+      // OSM / Topografi / Relief sudah punya label sendiri, matikan overlay label satelit
+      if(map.hasLayer(googleLabelsLayer)) map.removeLayer(googleLabelsLayer);
+      if(map.hasLayer(esriLabelsLayer)) map.removeLayer(esriLabelsLayer);
+    }
+  });
+
   applyTheme(localStorage.getItem(THEME_KEY) || 'light');
 
   function hexToRgb(hex){

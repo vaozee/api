@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Pantau Titik Panas - MSAL Group</title>
+<title>Pantau Titik Panas - MSAL Group (build 25-08f)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -125,6 +125,13 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; backgro
 .theme-toggle .ic-moon{opacity:1; transform:translateY(0) rotate(0);}
 html[data-theme="light"] .theme-toggle .ic-sun{opacity:1; transform:translateY(0) rotate(0);}
 html[data-theme="light"] .theme-toggle .ic-moon{opacity:0; transform:translateY(-8px) rotate(40deg);}
+
+.fullscreen-toggle{position:relative; overflow:hidden;}
+.fullscreen-toggle svg{position:absolute; width:15px; height:15px; transition:transform .3s ease, opacity .3s ease;}
+.fullscreen-toggle .ic-collapse{opacity:0; transform:scale(.6);}
+.fullscreen-toggle .ic-expand{opacity:1; transform:scale(1);}
+.fullscreen-toggle.is-full .ic-expand{opacity:0; transform:scale(.6);}
+.fullscreen-toggle.is-full .ic-collapse{opacity:1; transform:scale(1);}
 
 .status-banner{
   display:none; align-items:flex-start; gap:9px; padding:10px 11px; border-radius:10px; margin-bottom:14px;
@@ -553,20 +560,26 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
 }
 .kpp-label::before{ display:none; } /* sembunyikan panah tooltip leaflet */
 .kpp-labels-hidden .kpp-label{ display:none; }
-.cluster-glass{
-  position:relative; border-radius:50%; display:flex; align-items:center; justify-content:center;
-  border:1.5px solid rgba(255,255,255,0.55);
-  backdrop-filter:blur(9px) saturate(180%); -webkit-backdrop-filter:blur(9px) saturate(180%);
-  transition:transform .15s ease;
+.cluster-fire-marker{ position:relative; }
+.cluster-flame-wrap{
+  position:absolute; left:0; bottom:0; display:flex; align-items:flex-end; justify-content:center;
+  transform-origin:50% 92%; animation:flameFlicker 1.15s ease-in-out infinite;
+  filter:drop-shadow(0 0 7px rgba(255,110,40,.6)); transition:transform .15s ease;
 }
-.cluster-glass:hover{transform:scale(1.06);}
-.cluster-sheen{
-  position:absolute; top:14%; left:20%; width:38%; height:22%; border-radius:50%;
-  background:rgba(255,255,255,0.75); filter:blur(3px); pointer-events:none;
+.cluster-flame-wrap:hover{transform:scale(1.06);}
+.cluster-flame-wrap.low{animation-duration:1.5s;}
+.cluster-flame-wrap.nominal{animation-duration:1.25s;}
+.cluster-flame-wrap.high{animation-duration:0.95s;}
+.cluster-flame-wrap svg{display:block;}
+.cluster-flame-glow{
+  position:absolute; bottom:-1px; left:50%; width:78%; height:40%; border-radius:50%;
+  transform:translateX(-50%); filter:blur(6px); opacity:.65; z-index:-1; animation:glowPulse 1.15s ease-in-out infinite;
 }
-.cluster-count{
-  position:relative; z-index:1; color:#fff; font-family:'JetBrains Mono',monospace; font-weight:800;
-  font-size:13px; text-shadow:0 1px 3px rgba(0,0,0,.6);
+.cluster-fire-count{
+  position:absolute; top:0; left:50%; transform:translateX(-50%); z-index:5;
+  color:#fff; font-family:'JetBrains Mono',monospace; font-weight:800;
+  text-shadow:-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 5px rgba(0,0,0,.7);
+  pointer-events:none; white-space:nowrap;
 }
 
 @media (max-width:640px){
@@ -585,7 +598,7 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
   <span class="dot"></span>
   <div class="htxt">
     <h1>Pantau Titik Panas</h1>
-    <div class="sub" id="hdrSub">Belum dimuat — atur MAP_KEY di panel</div>
+    <div class="sub" id="hdrSub">Belum dimuat — atur MAP_KEY di panel · build 25-08f</div>
   </div>
   <button class="hdr-btn" id="refreshBtn" title="Muat ulang data" aria-label="Muat ulang data">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v6h-6"/></svg>
@@ -593,6 +606,10 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
   <button class="hdr-btn theme-toggle" id="themeToggleBtn" title="Ganti tema" aria-label="Ganti tema terang/gelap">
     <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></svg>
     <svg class="ic-moon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M15 3a9 9 0 1 0 6 15.5A9.5 9.5 0 0 1 15 3Z"/></svg>
+  </button>
+  <button class="hdr-btn fullscreen-toggle" id="fullscreenBtn" title="Layar penuh" aria-label="Layar penuh">
+    <svg class="ic-expand" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
+    <svg class="ic-collapse" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M9 21v-3a2 2 0 0 0-2-2H4M15 21v-3a2 2 0 0 1 2-2h3"/></svg>
   </button>
   <button class="hdr-btn" id="sourceInfoBtn" title="Sumber data" aria-label="Sumber data">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
@@ -669,9 +686,9 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
           <label for="rangeSelect">Periode</label>
           <div class="select-wrap">
             <select id="rangeSelect">
-              <option value="1" selected>24 jam</option>
+              <option value="1">24 jam</option>
               <option value="2">48 jam</option>
-              <option value="3">3 hari</option>
+              <option value="3" selected>3 hari</option>
               <option value="7">7 hari</option>
             </select>
           </div>
@@ -889,16 +906,25 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
       const n = cluster.getChildCount();
       let cls = 'low';
       cluster.getAllChildMarkers().forEach(m=>{ if(m.options.confClass==='high') cls='high'; else if(m.options.confClass==='nominal' && cls!=='high') cls='nominal'; });
-      const color = cls==='high' ? '#ef4444' : cls==='nominal' ? '#f2b134' : '#5b8fd9';
-      const [r,g,b] = hexToRgb(color);
-      const size = n>=50 ? 46 : n>=15 ? 42 : 38;
-      const html = `<div class="cluster-glass" style="width:${size}px;height:${size}px;
-        background:radial-gradient(circle at 34% 26%, rgba(${r},${g},${b},0.85) 0%, rgba(${r},${g},${b},0.62) 55%, rgba(${r},${g},${b},0.52) 100%);
-        box-shadow:0 8px 20px rgba(${r},${g},${b},0.45), 0 2px 6px rgba(0,0,0,.3), inset 0 1.5px 0 rgba(255,255,255,.65), inset 0 -6px 10px rgba(0,0,0,.2);">
-        <span class="cluster-sheen"></span>
-        <span class="cluster-count">${n}</span>
+      const color = cls==='high' ? '#ef4444' : cls==='nominal' ? '#f2b134' : '#ffb35c';
+      const size = n>=50 ? 56 : n>=15 ? 48 : 40;
+      const h = Math.round(size*1.3);
+      const delay = (Math.random()*1.4).toFixed(2);
+      const fontSize = n>=100 ? 11 : n>=10 ? 12 : 13;
+      const badgeH = fontSize + 6;
+      const gap = 3;
+      const totalH = h + badgeH + gap;
+      const html = `<div class="cluster-fire-marker" style="width:${size}px;height:${totalH}px;">
+        <span class="cluster-fire-count" style="font-size:${fontSize}px;">${n}</span>
+        <div class="cluster-flame-wrap ${cls}" style="width:${size}px;height:${h}px;animation-delay:-${delay}s;">
+          <svg viewBox="0 0 24 32" width="${size}" height="${h}">
+            <path d="M12 1.5C7.5 7 4 11.2 4 17.2A8 8 0 0 0 12 25.2a8 8 0 0 0 8-8c0-3.6-1.6-5.8-2.7-7.6.2 3-1.1 4-2 4 .9-4.3-1-7.6-3.3-12.1z" fill="${color}"/>
+            <path d="M12 12.5c-1.6 2.4-2.6 4-2.6 6a3.4 3.4 0 0 0 6.8 0c0-1.4-.6-2.3-1-3 0 1.1-.7 1.5-1.2 1.4.6-1.7-.4-3-2-4.4z" fill="#fff4d6" opacity=".85"/>
+          </svg>
+          <div class="cluster-flame-glow" style="background:${color};"></div>
+        </div>
       </div>`;
-      return L.divIcon({ html, className:'cluster-icon-wrap', iconSize:[size,size] });
+      return L.divIcon({ html, className:'cluster-icon-wrap', iconSize:[size,totalH], iconAnchor:[size/2, totalH] });
     }
   });
   map.addLayer(clusterGroup);
@@ -966,6 +992,7 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
   const hotspotList = document.getElementById('hotspotList');
   const toast = document.getElementById('toast');
   const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
   const statusBanner = document.getElementById('statusBanner');
   const keyBlock = document.getElementById('keyBlock');
   const embeddedKeyBlock = document.getElementById('embeddedKeyBlock');
@@ -978,6 +1005,24 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
     const cur = document.documentElement.getAttribute('data-theme') || 'dark';
     applyTheme(cur === 'dark' ? 'light' : 'dark');
   });
+
+  // ---------- tombol layar penuh ----------
+  function syncFullscreenBtn(){
+    const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    fullscreenBtn.classList.toggle('is-full', isFull);
+    fullscreenBtn.title = isFull ? 'Keluar layar penuh' : 'Layar penuh';
+  }
+  fullscreenBtn.addEventListener('click', ()=>{
+    const el = document.documentElement;
+    const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if(!isFull){
+      (el.requestFullscreen || el.webkitRequestFullscreen || function(){}).call(el);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+    }
+  });
+  document.addEventListener('fullscreenchange', syncFullscreenBtn);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenBtn);
 
   // ---------- tombol tunggal "Sumber Data" di header ----------
   sourceInfoBtn.addEventListener('click', ()=>{ sourceBox.classList.toggle('hidden'); });

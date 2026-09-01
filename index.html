@@ -197,6 +197,14 @@ html[data-theme="light"] .theme-toggle .ic-moon{opacity:0; transform:translateY(
 }
 .source-box-close:hover{background:var(--field-bg-hover); border-color:var(--ember-dim);}
 .source-box-body{padding:14px 14px 16px;}
+.basemap-list{display:flex; flex-direction:column; gap:4px; margin-bottom:2px;}
+.basemap-opt{
+  display:flex; align-items:center; gap:9px; font-size:12px; color:var(--text); cursor:pointer;
+  padding:7px 8px; border-radius:8px; transition:background .15s;
+}
+.basemap-opt:hover{background:var(--field-bg-hover);}
+.basemap-opt input{accent-color:var(--ember); width:14px; height:14px; flex:none; cursor:pointer;}
+.basemap-overlays{margin-top:10px; padding-top:10px; border-top:1px solid var(--line);}
 
 /* ---------- alert titik api dekat/di dalam wilayah PSAM (mengambang di bawah header) ---------- */
 .psam-alert{
@@ -623,6 +631,20 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
     <button class="source-box-close" id="sourceBoxClose" title="Tutup" aria-label="Tutup">✕</button>
   </div>
   <div class="source-box-body">
+    <div class="block" id="basemapBlock">
+      <p class="p-title">Tampilan Peta</p>
+      <div class="basemap-list" id="basemapList">
+        <label class="basemap-opt"><input type="radio" name="basemapChoice" value="googleSat" checked><span>Google Satellite (terkini)</span></label>
+        <label class="basemap-opt"><input type="radio" name="basemapChoice" value="esriSat"><span>Esri World Imagery</span></label>
+        <label class="basemap-opt"><input type="radio" name="basemapChoice" value="esriTopo"><span>Esri Topografi</span></label>
+        <label class="basemap-opt"><input type="radio" name="basemapChoice" value="esriTerrain"><span>Esri Relief Bayangan</span></label>
+        <label class="basemap-opt"><input type="radio" name="basemapChoice" value="osm"><span>OpenStreetMap</span></label>
+      </div>
+      <div class="basemap-list basemap-overlays" id="basemapOverlayList">
+        <label class="basemap-opt"><input type="checkbox" id="labelGoogleChk" checked><span>Label Google (jalan/nama tempat)</span></label>
+        <label class="basemap-opt"><input type="checkbox" id="labelEsriChk"><span>Label Esri (jalan/nama tempat)</span></label>
+      </div>
+    </div>
     <div class="block" id="keyBlock" style="margin-bottom:0; padding-bottom:0; border-bottom:none;">
       <p class="p-title">NASA FIRMS — MAP_KEY</p>
       <div class="field" style="margin-bottom:8px;">
@@ -867,32 +889,49 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
   googleSatLayer.addTo(map);
   googleLabelsLayer.addTo(map);
 
-  const baseLayers = {
-    'Google Satellite (terkini)': googleSatLayer,
-    'Esri World Imagery': esriSatLayer,
-    'Esri Topografi': esriTopoLayer,
-    'Esri Relief Bayangan': esriTerrainLayer,
-    'OpenStreetMap': osmLayer
+  // ---------- pemilih tampilan peta (basemap) ----------
+  // Sebelumnya ini kontrol togel terpisah yang mengambang di pojok kiri-bawah peta (L.control.layers).
+  // Sekarang digabung ke tombol "Sumber Data" di header — pilihannya ada di dalam box yang sama.
+  const basemapLayerByKey = {
+    googleSat: googleSatLayer,
+    esriSat: esriSatLayer,
+    esriTopo: esriTopoLayer,
+    esriTerrain: esriTerrainLayer,
+    osm: osmLayer
   };
-  L.control.layers(baseLayers, {
-    'Label Google': googleLabelsLayer,
-    'Label Esri': esriLabelsLayer
-  }, { position:'bottomleft', collapsed:true }).addTo(map);
+  let activeBasemapKey = 'googleSat';
+  const labelGoogleChk = document.getElementById('labelGoogleChk');
+  const labelEsriChk = document.getElementById('labelEsriChk');
 
-  // Saat ganti basemap, pastikan hanya satu layer label satelit aktif agar tidak tumpang tindih
-  map.on('baselayerchange', function(e){
-    if(e.layer === googleSatLayer){
-      if(!map.hasLayer(googleLabelsLayer)) map.addLayer(googleLabelsLayer);
+  // Pastikan hanya satu layer label satelit aktif agar tidak tumpang tindih
+  function syncLabelOverlaysForBasemap(key){
+    if(key === 'googleSat'){
       if(map.hasLayer(esriLabelsLayer)) map.removeLayer(esriLabelsLayer);
-    } else if(e.layer === esriSatLayer){
-      if(!map.hasLayer(esriLabelsLayer)) map.addLayer(esriLabelsLayer);
+      if(labelGoogleChk.checked && !map.hasLayer(googleLabelsLayer)) map.addLayer(googleLabelsLayer);
+      else if(!labelGoogleChk.checked && map.hasLayer(googleLabelsLayer)) map.removeLayer(googleLabelsLayer);
+    } else if(key === 'esriSat'){
       if(map.hasLayer(googleLabelsLayer)) map.removeLayer(googleLabelsLayer);
+      if(labelEsriChk.checked && !map.hasLayer(esriLabelsLayer)) map.addLayer(esriLabelsLayer);
+      else if(!labelEsriChk.checked && map.hasLayer(esriLabelsLayer)) map.removeLayer(esriLabelsLayer);
     } else {
       // OSM / Topografi / Relief sudah punya label sendiri, matikan overlay label satelit
       if(map.hasLayer(googleLabelsLayer)) map.removeLayer(googleLabelsLayer);
       if(map.hasLayer(esriLabelsLayer)) map.removeLayer(esriLabelsLayer);
     }
+  }
+  document.querySelectorAll('input[name="basemapChoice"]').forEach(radio=>{
+    radio.addEventListener('change', ()=>{
+      if(!radio.checked) return;
+      const newKey = radio.value;
+      if(newKey === activeBasemapKey) return;
+      map.removeLayer(basemapLayerByKey[activeBasemapKey]);
+      map.addLayer(basemapLayerByKey[newKey]);
+      activeBasemapKey = newKey;
+      syncLabelOverlaysForBasemap(newKey);
+    });
   });
+  labelGoogleChk.addEventListener('change', ()=> syncLabelOverlaysForBasemap(activeBasemapKey));
+  labelEsriChk.addEventListener('change', ()=> syncLabelOverlaysForBasemap(activeBasemapKey));
 
   applyTheme(localStorage.getItem(THEME_KEY) || 'light');
 
@@ -1395,26 +1434,48 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
   }
   if(window.speechSynthesis){
     window.speechSynthesis.onvoiceschanged = ()=>{ cachedIdVoice = null; getIdVoice(); };
+    // Safari kadang tidak pernah memicu 'voiceschanged' untuk suara lokal, jadi daftar suara
+    // dipancing dimuat lebih awal dan dicoba ulang beberapa kali di detik-detik pertama.
+    getIdVoice();
+    setTimeout(getIdVoice, 500);
+    setTimeout(getIdVoice, 1500);
   }
+  // Safari/WebKit dikenal membuang (garbage-collect) objek SpeechSynthesisUtterance sebelum
+  // selesai dibacakan kalau tidak ada referensi lain yang menahannya — akibatnya suara langsung
+  // bisu tanpa memicu event error apa pun. Simpan referensinya di sini selama masih dibacakan.
+  const activeUtterances = [];
+  let hasUserInteracted = false;
+  let failedSpeechQueue = [];
   function speakNow(text){
     if(!window.speechSynthesis || !text) return;
+    // Peramban (terutama Safari) memblokir/membisukan audio otomatis sebelum ada interaksi
+    // pengguna, dan Safari sering TIDAK memicu event 'error' saat ini terjadi — jadi jangan
+    // menunggu sampai gagal dulu, cukup antre saja sampai interaksi pertama benar-benar terjadi.
+    if(!hasUserInteracted){ failedSpeechQueue.push(text); return; }
     try{
+      window.speechSynthesis.resume(); // Safari kadang "macet" di status pause setelah tab tidak aktif — bangunkan dulu
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = SPEECH_LANG;
       const v = getIdVoice();
       if(v) utter.voice = v;
       utter.rate = 1; utter.pitch = 1;
-      utter.onerror = ()=>{ failedSpeechQueue.push(text); }; // biasanya terjadi bila peramban memblokir audio otomatis
+      activeUtterances.push(utter); // cegah GC dini di Safari
+      const cleanup = ()=>{
+        const i = activeUtterances.indexOf(utter);
+        if(i>-1) activeUtterances.splice(i,1);
+      };
+      utter.onend = cleanup;
+      utter.onerror = ()=>{ cleanup(); failedSpeechQueue.push(text); }; // jaring pengaman terakhir untuk peramban lain
       window.speechSynthesis.speak(utter); // dimasukkan ke antrean bawaan browser — kalimat sebelumnya (PSAM/PEAK) tetap selesai dibacakan dulu, lalu bergantian
     }catch(e){ failedSpeechQueue.push(text); }
   }
-  let failedSpeechQueue = [];
   function speakAlert(text){
     speakNow(text);
   }
   // sebagian peramban (mis. Chrome/Safari) memblokir audio otomatis sebelum ada interaksi pengguna —
-  // begitu ada interaksi pertama, bacakan ulang peringatan yang gagal terputar tadi secara berurutan.
+  // begitu ada interaksi pertama, bacakan ulang peringatan yang tertunda tadi secara berurutan.
   function retrySpeechOnInteraction(){
+    hasUserInteracted = true;
     const queued = failedSpeechQueue.splice(0);
     queued.forEach(t=> speakNow(t));
   }

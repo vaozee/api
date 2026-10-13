@@ -597,6 +597,119 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
   .hdr .sub{ display:none; }
 }
 </style>
+<script>
+/* ===== MSALVoice v1 — metode & aturan sama dengan suara di index.html (ES5, ringan, aman untuk web TV spek rendah) =====
+   Mode: auto (suara perangkat -> online) | dev (hanya perangkat) | net (hanya online) | off.
+   Perangkat: speechSynthesis + pengawas 1,8 dtk (tidak mulai -> online). Online: <audio> Google TTS, potongan <=170 huruf,
+   batas 7 dtk per potongan, jalur cadangan berputar & jalur yang berhasil diingat. Antrean peringatan menunggu interaksi pertama. */
+(function(w){
+if(w.MSALVoice)return;
+var d=document,SK='msal_voice_v1',EPK='msal_voice_ep';
+var MODES=[['auto','Otomatis (perangkat, lalu online)'],['dev','Hanya suara perangkat'],['net','Hanya suara online'],['off','Mati']];
+var RATES=[[.7,'Lambat'],[.9,'Normal'],[1.1,'Cepat']];
+function ld(){var o={};try{o=JSON.parse(localStorage.getItem(SK)||'{}')||{}}catch(e){}return o}
+function cfg(){var o=ld();return{tts:o.tts||'auto',rate:o.rate||.9,vname:o.vname||''}}
+var subs=[];function ch(){for(var i=0;i<subs.length;i++){try{subs[i]()}catch(e){}}}
+function save(p){var o=ld(),k;for(k in p)o[k]=p[k];try{localStorage.setItem(SK,JSON.stringify(o))}catch(e){}ch()}
+var syn=null;try{syn=w.speechSynthesis||null}catch(e){}
+function voices(){try{return syn&&syn.getVoices()||[]}catch(e){return[]}}
+if(syn){voices();try{if(syn.addEventListener)syn.addEventListener('voiceschanged',voices);else syn.onvoiceschanged=voices}catch(e){}setTimeout(voices,500);setTimeout(voices,1500)}
+function idVoices(){var v=voices(),o=[],i;for(i=0;i<v.length;i++)if(/^(id|in)([-_]|$)/i.test(v[i].lang||''))o.push(v[i]);return o}
+function pickVoice(){var l=idVoices(),n=cfg().vname,i;if(n)for(i=0;i<l.length;i++)if(l[i].name===n)return l[i];return l[0]||null}
+var EP=[
+ {n:'Google',u:function(q){return 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=id&total=1&idx=0&textlen='+q.length+'&q='+encodeURIComponent(q)}},
+ {n:'Google gtx',u:function(q){return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=id&q='+encodeURIComponent(q)}},
+ {n:'Google .co.id',u:function(q){return 'https://translate.google.co.id/translate_tts?ie=UTF-8&client=tw-ob&tl=id&total=1&idx=0&textlen='+q.length+'&q='+encodeURIComponent(q)}}];
+var tk=0,au=null,toast=null,tmr=null,styled=false,queue=[],pending=[],busy=false,interacted=false,utts=[];
+function css(){if(styled)return;styled=true;var s=d.createElement('style');s.id='mv-css';
+ s.textContent='#mv-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483646;max-width:92vw;padding:10px 16px;border-radius:18px;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#fff;background:rgba(20,40,36,.94);border:1px solid rgba(255,255,255,.3);box-shadow:0 10px 30px rgba(0,0,0,.35);text-align:center;cursor:pointer;display:none}'+
+ '#mv-ov{position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483647;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:12px;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}'+
+ '#mv-card{background:#f4f8f6;color:#10302b;border-radius:18px;padding:18px 20px;width:420px;max-width:100%;max-height:92vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.5)}'+
+ '#mv-card h3{margin:0 0 6px;font-size:18px}#mv-card h4{margin:14px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#4d6661}'+
+ '#mv-card label{display:block;padding:8px 10px;border-radius:10px;cursor:pointer;margin:2px 0}#mv-card label:hover{background:#e3eeea}#mv-card input[type=radio]{margin-right:8px;transform:scale(1.2)}'+
+ '#mv-card .mv-row{display:flex;gap:8px;flex-wrap:wrap}#mv-card .mv-row label{flex:1;text-align:center;border:1.5px solid #cfe0da;min-width:80px}'+
+ '#mv-card select{width:100%;padding:9px;border-radius:10px;border:1.5px solid #cfe0da;font:inherit;background:#fff;color:#10302b}'+
+ '#mv-card button{border:0;border-radius:999px;padding:10px 18px;font:inherit;font-weight:700;cursor:pointer;background:#0f5c4d;color:#fff;margin:8px 8px 0 0}#mv-card button.sec{background:#cfe0da;color:#10302b}'+
+ '#mv-card button:focus,#mv-card label:focus-within,#mv-card select:focus{outline:3px solid #f2c230}#mv-card p{margin:10px 0 0;font-size:12.5px;color:#4d6661}';
+ (d.head||d.documentElement).appendChild(s)}
+function note(t,ms){css();if(!toast){toast=d.createElement('div');toast.id='mv-toast';toast.onclick=stop;(d.body||d.documentElement).appendChild(toast)}
+ toast.textContent=t;toast.style.display='block';clearTimeout(tmr);if(ms){var k=tk;tmr=setTimeout(function(){if(k===tk&&toast)toast.style.display='none'},ms)}}
+function stop(){tk++;queue.length=0;busy=false;try{syn&&syn.cancel()}catch(e){}if(au){try{au.pause()}catch(e){}au=null}clearTimeout(tmr);if(toast)toast.style.display='none'}
+function chunks(s){var out=[],parts=s.match(/[^.!?;:,\n]+[.!?;:,\n]*/g)||[s];
+ for(var j=0;j<parts.length;j++){var p=parts[j].replace(/^\s+|\s+$/g,'');while(p.length>170){var i=p.lastIndexOf(' ',170);if(i<40)i=170;out.push(p.slice(0,i));p=p.slice(i).replace(/^\s+/,'')}if(p)out.push(p)}return out}
+/* satu bacaan penuh; cb dipanggil saat selesai/gagal supaya antrean lanjut */
+function run(txt,cb,manual){
+ var C=cfg(),my=tk,log=[],rate=C.rate||.9;
+ txt=String(txt).replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'');if(!txt){cb&&cb();return}
+ function fin(){if(my!==tk)return;if(toast)toast.style.display='none';cb&&cb()}
+ function fail(){if(my!==tk)return;note('Suara gagal ('+log.join(' · ')+'). Pasang suara Indonesia di sistem (Android: Pengaturan > Bahasa > Teks-ke-ucapan; Windows: Pengaturan > Waktu & bahasa > Ucapan > Tambah suara) atau coba Chrome / Edge.',9000);cb&&cb()}
+ function online(si){
+  if(my!==tk)return;if(C.tts==='dev')return fail();
+  var list=chunks(txt),i=si||0,e0=0;try{e0=+localStorage.getItem(EPK)||0}catch(e){}if(e0>=EP.length)e0=0;
+  var tried=0,ep=e0;note('🔊 memuat suara online… (ketuk untuk berhenti)');
+  function play(){
+   if(my!==tk)return;if(i>=list.length)return fin();
+   var a=new Audio(EP[ep].u(list[i]));try{a.referrerPolicy='no-referrer'}catch(e){}
+   try{a.playbackRate=Math.min(1.5,Math.max(.6,rate/.9))}catch(e){}
+   au=a;var ok=false,dead=false;
+   var t=setTimeout(function(){if(!ok)bad('lambat')},7000);
+   function bad(why){if(dead||my!==tk||au!==a)return;dead=true;clearTimeout(t);try{a.pause()}catch(e){}
+    log.push(EP[ep].n+': '+(why||'gagal'));tried++;if(tried<EP.length){ep=(ep+1)%EP.length;play()}else fail()}
+   a.onplaying=function(){if(dead||my!==tk)return;ok=true;clearTimeout(t);try{localStorage.setItem(EPK,ep)}catch(e){}note('🔊 '+list[i].slice(0,60)+' · ketuk untuk berhenti')};
+   a.onended=function(){if(my!==tk)return;i++;tried=0;play()};
+   a.onerror=function(){bad('diblokir/gagal')};
+   var p;try{p=a.play()}catch(e){bad('error');return}if(p&&p.catch)p.catch(function(){bad('ditolak')})}
+  play()}
+ var v=(C.tts!=='net'&&syn)?pickVoice():null;
+ if(v){
+  var list=chunks(txt),i=0,started=false;
+  note('🔊 '+txt.slice(0,60)+(txt.length>60?'…':'')+' · ketuk untuk berhenti');
+  var rm=function(u){var k=utts.indexOf(u);if(k>-1)utts.splice(k,1)};
+  var next=function(){
+   if(my!==tk)return;if(i>=list.length)return fin();
+   var u=new SpeechSynthesisUtterance(list[i]);u.voice=v;u.lang=v.lang;u.rate=rate;utts.push(u);
+   u.onstart=function(){started=true};
+   u.onend=function(){rm(u);i++;next()};
+   u.onerror=function(ev){rm(u);if(my!==tk)return;if(ev&&/cancel|interrupt/.test(ev.error||''))return;log.push('perangkat: '+(ev&&ev.error||'gagal'));try{syn.cancel()}catch(e){}online(i)};
+   try{syn.resume();syn.speak(u)}catch(e){log.push('perangkat: error');online(i)}};
+  next();
+  setTimeout(function(){if(my===tk&&!started&&!syn.speaking){try{syn.cancel()}catch(e){}log.push('perangkat: tidak mulai');online(0)}},1800);
+  return}
+ log.push(C.tts==='net'?'online dipilih':'perangkat: tidak ada suara Indonesia');
+ online(0)}
+function pump(){if(busy||!queue.length)return;busy=true;var t=queue.shift(),my=tk;run(t,function(){if(my!==tk)return;busy=false;pump()})}
+function off(manual){if(cfg().tts==='off'){if(manual)note('Suara sedang mati. Buka Pengaturan Suara (🔊) untuk menyalakan.',3500);return true}return false}
+/* say: masuk antrean (untuk peringatan otomatis berurutan). speak: potong bacaan sebelumnya (untuk klik/ulang). */
+function say(t,o){if(!t||off(o&&o.manual))return;if(!interacted){pending.push(t);return}queue.push(t);pump()}
+function speak(t,o){if(!t||off(o&&o.manual))return;if(!interacted){pending=[t];return}stop();busy=true;var my=tk;run(t,function(){if(my===tk)busy=false;pump()},o&&o.manual)}
+function onUse(){if(interacted)return;interacted=true;
+ try{var ua=navigator.userAgent;if(syn&&/Safari/.test(ua)&&!/Chrome|Chromium|Android/.test(ua)){var u=new SpeechSynthesisUtterance('');u.volume=0;syn.speak(u)}}catch(e){}
+ var q=pending.splice(0);for(var i=0;i<q.length;i++)say(q[i])}
+var evs=['click','touchstart','keydown','pointerdown'];for(var e=0;e<evs.length;e++)w.addEventListener(evs[e],onUse,true);
+function status(){var v=pickVoice(),C=cfg();return 'Perangkat: '+(syn?(v?v.name+' ('+v.lang+')':'tidak ada suara Indonesia'):'tidak didukung')+' · Online: Google TTS ('+EP.length+' jalur) · Mode: '+(MODES.filter(function(m){return m[0]===C.tts})[0]||[0,C.tts])[1]}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function panel(){
+ var ex=d.getElementById('mv-ov');if(ex){ex.parentNode.removeChild(ex);return}
+ css();var C=cfg(),vs=idVoices(),h='<div id="mv-card" role="dialog" aria-label="Pengaturan Suara"><h3>🔊 Pengaturan Suara</h3><h4>Mode suara</h4>',i;
+ for(i=0;i<MODES.length;i++)h+='<label><input type="radio" name="mvm" value="'+MODES[i][0]+'"'+(C.tts===MODES[i][0]?' checked':'')+'>'+MODES[i][1]+'</label>';
+ h+='<h4>Kecepatan</h4><div class="mv-row">';
+ for(i=0;i<RATES.length;i++)h+='<label><input type="radio" name="mvr" value="'+RATES[i][0]+'"'+(C.rate===RATES[i][0]?' checked':'')+'>'+RATES[i][1]+'</label>';
+ h+='</div><h4>Suara perangkat</h4><select id="mvv"><option value="">Otomatis (bahasa Indonesia)</option>';
+ for(i=0;i<vs.length;i++)h+='<option value="'+esc(vs[i].name)+'"'+(C.vname===vs[i].name?' selected':'')+'>'+esc(vs[i].name)+' ('+esc(vs[i].lang)+')</option>';
+ h+='</select><p id="mvs"></p><button id="mvt">▶ Tes suara</button><button id="mvx" class="sec">■ Hentikan</button><button id="mvc" class="sec">Tutup</button>'+
+  '<p>Mode otomatis memakai suara perangkat lebih dulu; bila tidak ada atau gagal, beralih ke suara online (perlu internet). Pada TV/peramban tanpa suara Indonesia, pilih “Hanya suara online”.</p></div>';
+ var ov=d.createElement('div');ov.id='mv-ov';ov.innerHTML=h;(d.body||d.documentElement).appendChild(ov);
+ var q=function(s){return ov.querySelector(s)},closeP=function(){if(ov.parentNode)ov.parentNode.removeChild(ov);d.removeEventListener('keydown',esck,true)};
+ function esck(ev){if(ev.key==='Escape'||ev.keyCode===27)closeP()}d.addEventListener('keydown',esck,true);
+ q('#mvs').textContent=status();
+ ov.onclick=function(ev){if(ev.target===ov)closeP()};
+ ov.onchange=function(ev){var t=ev.target;if(t.name==='mvm'){stop();save({tts:t.value})}else if(t.name==='mvr')save({rate:parseFloat(t.value)});else if(t.id==='mvv')save({vname:t.value});q('#mvs').textContent=status()};
+ q('#mvt').onclick=function(){speak('Tes suara. Peringatan kualitas udara dan titik panas siap dibacakan.',{manual:true})};
+ q('#mvx').onclick=stop;q('#mvc').onclick=closeP;
+ try{(q('input[name=mvm]:checked')||q('#mvc')).focus()}catch(e){}}
+w.MSALVoice={say:say,speak:speak,stop:stop,panel:panel,cfg:cfg,status:status,onChange:function(f){subs.push(f)},icon:function(){return cfg().tts==='off'?'🔇':'🔊'},_chunks:chunks};
+})(window);
+</script>
 </head>
 <body>
 
@@ -608,6 +721,7 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
     <h1>Pantau Titik Panas</h1>
     <div class="sub" id="hdrSub">Belum dimuat — atur MAP_KEY di panel · build 25-08f</div>
   </div>
+  <button class="hdr-btn" id="voiceBtn" title="Pengaturan suara" aria-label="Pengaturan suara">🔊</button>
   <button class="hdr-btn" id="refreshBtn" title="Muat ulang data" aria-label="Muat ulang data">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v6h-6"/></svg>
   </button>
@@ -1422,64 +1536,16 @@ window.KPP_BLOCK_DATA = {"bbox":[113.106954,-1.60606,113.162244,-1.5717],"blocks
     return null;
   }
 
-  // ---------- suara peringatan otomatis (Web Speech API) ----------
-  const SPEECH_LANG = 'id-ID';
-  let cachedIdVoice = null;
-  function getIdVoice(){
-    if(!window.speechSynthesis) return null;
-    if(cachedIdVoice) return cachedIdVoice;
-    const voices = window.speechSynthesis.getVoices();
-    cachedIdVoice = voices.find(v=> v.lang && v.lang.toLowerCase().startsWith('id')) || null;
-    return cachedIdVoice;
-  }
-  if(window.speechSynthesis){
-    window.speechSynthesis.onvoiceschanged = ()=>{ cachedIdVoice = null; getIdVoice(); };
-    // Safari kadang tidak pernah memicu 'voiceschanged' untuk suara lokal, jadi daftar suara
-    // dipancing dimuat lebih awal dan dicoba ulang beberapa kali di detik-detik pertama.
-    getIdVoice();
-    setTimeout(getIdVoice, 500);
-    setTimeout(getIdVoice, 1500);
-  }
-  // Safari/WebKit dikenal membuang (garbage-collect) objek SpeechSynthesisUtterance sebelum
-  // selesai dibacakan kalau tidak ada referensi lain yang menahannya — akibatnya suara langsung
-  // bisu tanpa memicu event error apa pun. Simpan referensinya di sini selama masih dibacakan.
-  const activeUtterances = [];
-  let hasUserInteracted = false;
-  let failedSpeechQueue = [];
-  function speakNow(text){
-    if(!window.speechSynthesis || !text) return;
-    // Peramban (terutama Safari) memblokir/membisukan audio otomatis sebelum ada interaksi
-    // pengguna, dan Safari sering TIDAK memicu event 'error' saat ini terjadi — jadi jangan
-    // menunggu sampai gagal dulu, cukup antre saja sampai interaksi pertama benar-benar terjadi.
-    if(!hasUserInteracted){ failedSpeechQueue.push(text); return; }
-    try{
-      window.speechSynthesis.resume(); // Safari kadang "macet" di status pause setelah tab tidak aktif — bangunkan dulu
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = SPEECH_LANG;
-      const v = getIdVoice();
-      if(v) utter.voice = v;
-      utter.rate = 1; utter.pitch = 1;
-      activeUtterances.push(utter); // cegah GC dini di Safari
-      const cleanup = ()=>{
-        const i = activeUtterances.indexOf(utter);
-        if(i>-1) activeUtterances.splice(i,1);
-      };
-      utter.onend = cleanup;
-      utter.onerror = ()=>{ cleanup(); failedSpeechQueue.push(text); }; // jaring pengaman terakhir untuk peramban lain
-      window.speechSynthesis.speak(utter); // dimasukkan ke antrean bawaan browser — kalimat sebelumnya (PSAM/PEAK) tetap selesai dibacakan dulu, lalu bergantian
-    }catch(e){ failedSpeechQueue.push(text); }
-  }
-  function speakAlert(text){
-    speakNow(text);
-  }
-  // sebagian peramban (mis. Chrome/Safari) memblokir audio otomatis sebelum ada interaksi pengguna —
-  // begitu ada interaksi pertama, bacakan ulang peringatan yang tertunda tadi secara berurutan.
-  function retrySpeechOnInteraction(){
-    hasUserInteracted = true;
-    const queued = failedSpeechQueue.splice(0);
-    queued.forEach(t=> speakNow(t));
-  }
-  ['click','touchstart','keydown'].forEach(evt=> window.addEventListener(evt, retrySpeechOnInteraction, { once:true }));
+  // ---------- suara peringatan otomatis: mesin MSALVoice (sama dengan metode suara index.html) ----------
+  // Suara perangkat lebih dulu, bila tidak ada/gagal beralih ke suara online; antrean berurutan (PSAM, PEAK, WCJU, KPP);
+  // peringatan yang muncul sebelum interaksi pertama ditahan lalu dibacakan. Pengaturan: tombol 🔊 di header.
+  function speakAlert(text){ if(text) MSALVoice.say(text); }
+  (function(){
+    const b = document.getElementById('voiceBtn'); if(!b) return;
+    const sync = ()=>{ b.textContent = MSALVoice.icon(); };
+    b.onclick = ()=> MSALVoice.panel();
+    MSALVoice.onChange(sync); sync();
+  })();
   function fmtDistSpeech(m){
     return m < 1000 ? `${Math.round(m)} meter` : `${(m/1000).toFixed(1).replace('.', ',')} km`;
   }

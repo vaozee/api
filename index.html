@@ -598,7 +598,7 @@ select option{background:var(--popup-bg); color:var(--popup-text);}
 }
 </style>
 <script>
-/* ===== MSALVoice v1 — metode & aturan sama dengan suara di index.html (ES5, ringan, aman untuk web TV spek rendah) =====
+/* ===== MSALVoice v2 — metode & aturan sama dengan suara di index.html (ES5, ringan, aman untuk web TV spek rendah) =====
    Mode: auto (suara perangkat -> online) | dev (hanya perangkat) | net (hanya online) | off.
    Perangkat: speechSynthesis + pengawas 1,8 dtk (tidak mulai -> online). Online: <audio> Google TTS, potongan <=170 huruf,
    batas 7 dtk per potongan, jalur cadangan berputar & jalur yang berhasil diingat. Antrean peringatan menunggu interaksi pertama. */
@@ -608,7 +608,7 @@ var d=document,SK='msal_voice_v1',EPK='msal_voice_ep';
 var MODES=[['auto','Otomatis (perangkat, lalu online)'],['dev','Hanya suara perangkat'],['net','Hanya suara online'],['off','Mati']];
 var RATES=[[.7,'Lambat'],[.9,'Normal'],[1.1,'Cepat']];
 function ld(){var o={};try{o=JSON.parse(localStorage.getItem(SK)||'{}')||{}}catch(e){}return o}
-function cfg(){var o=ld();return{tts:o.tts||'auto',rate:o.rate||.9,vname:o.vname||''}}
+function cfg(){var o=ld();return{tts:o.tts||'auto',rate:o.rate||.9,vname:o.vname||'',gkey:o.gkey||''}}
 var subs=[];function ch(){for(var i=0;i<subs.length;i++){try{subs[i]()}catch(e){}}}
 function save(p){var o=ld(),k;for(k in p)o[k]=p[k];try{localStorage.setItem(SK,JSON.stringify(o))}catch(e){}ch()}
 var syn=null;try{syn=w.speechSynthesis||null}catch(e){}
@@ -620,6 +620,32 @@ var EP=[
  {n:'Google',u:function(q){return 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=id&total=1&idx=0&textlen='+q.length+'&q='+encodeURIComponent(q)}},
  {n:'Google gtx',u:function(q){return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=id&q='+encodeURIComponent(q)}},
  {n:'Google .co.id',u:function(q){return 'https://translate.google.co.id/translate_tts?ie=UTF-8&client=tw-ob&tl=id&total=1&idx=0&textlen='+q.length+'&q='+encodeURIComponent(q)}}];
+/* Permintaan audio dari <audio> biasa selalu membawa Referer halaman (a.referrerPolicy tidak berlaku pada Audio), dan Google TTS menolaknya.
+   Solusi: audio dibuat di dalam iframe tersembunyi yang dokumennya ber-<meta referrer=no-referrer>, jadi Referer tidak dikirim. */
+var fr=null,fw=null,frs=0; /* frs: 0 belum, 1 memuat, 2 siap, 3 gagal */
+function prep(){if(frs||!d.body)return;frs=1;
+ try{fr=d.createElement('iframe');fr.setAttribute('aria-hidden','true');fr.setAttribute('tabindex','-1');fr.setAttribute('allow','autoplay');fr.setAttribute('referrerpolicy','no-referrer');
+  fr.style.cssText='position:fixed;left:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+  fr.onload=function(){try{fw=fr.contentWindow;if(!fw||!fw.Audio){fw=null;frs=3}else frs=2}catch(e){fw=null;frs=3}};
+  fr.onerror=function(){frs=3};
+  fr.srcdoc='<!doctype html><meta name="referrer" content="never"><meta name="referrer" content="no-referrer"><title>v</title>';
+  d.body.appendChild(fr);setTimeout(function(){if(frs===1)frs=3},2500)}catch(e){frs=3;fw=null}}
+function ready(cb){prep();var n=0;(function w8(){if(frs!==1||n++>40)return cb();setTimeout(w8,50)})()}
+function mkAudio(u){try{if(fw)return new fw.Audio(u)}catch(e){}return new Audio(u)}
+function cloud(txt,rate,cb){var k=cfg().gkey;if(!k)return cb(null,'tanpa kunci');var x=new XMLHttpRequest(),dn=false;
+ function r(u,y){if(dn)return;dn=true;cb(u,y)}
+ try{x.open('POST','https://texttospeech.googleapis.com/v1/text:synthesize?key='+encodeURIComponent(k));x.setRequestHeader('Content-Type','application/json');x.timeout=7000;
+  x.onload=function(){try{var j=JSON.parse(x.responseText);if(x.status===200&&j.audioContent)r('data:audio/mp3;base64,'+j.audioContent);else r(null,'HTTP '+x.status)}catch(e){r(null,'respons rusak')}};
+  x.onerror=x.ontimeout=function(){r(null,'koneksi')};
+  x.send(JSON.stringify({input:{text:txt},voice:{languageCode:'id-ID',name:'id-ID-Standard-A'},audioConfig:{audioEncoding:'MP3',speakingRate:Math.min(1.5,Math.max(.6,rate/.9))}}))}catch(e){r(null,'error')}}
+function eps(){return cfg().gkey?[{n:'Google Cloud',c:1}].concat(EP):EP}
+function probe(cb){var E=eps(),res=[],n=0;
+ function one(k,ok,why){if(res[k])return;res[k]=E[k].n+': '+(ok?'OK':(why||'gagal'));if(++n===E.length)cb(res.join(' · '))}
+ ready(function(){for(var k=0;k<E.length;k++)(function(k){
+  if(E[k].c){cloud('tes',.9,function(u,y){one(k,!!u,y)});return}
+  var a;try{a=mkAudio(E[k].u('tes'))}catch(e){one(k,0,'error');return}
+  a.muted=true;a.preload='auto';a.oncanplay=function(){try{a.pause()}catch(e){}one(k,1)};a.onerror=function(){one(k,0,'diblokir/gagal')};
+  setTimeout(function(){try{a.pause()}catch(e){}one(k,0,'lambat')},7000);try{var p=a.play();if(p&&p.catch)p.catch(function(){})}catch(e){}})(k)})}
 var tk=0,au=null,toast=null,tmr=null,styled=false,queue=[],pending=[],busy=false,interacted=false,utts=[];
 function css(){if(styled)return;styled=true;var s=d.createElement('style');s.id='mv-css';
  s.textContent='#mv-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483646;max-width:92vw;padding:10px 16px;border-radius:18px;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#fff;background:rgba(20,40,36,.94);border:1px solid rgba(255,255,255,.3);box-shadow:0 10px 30px rgba(0,0,0,.35);text-align:center;cursor:pointer;display:none}'+
@@ -642,24 +668,27 @@ function run(txt,cb,manual){
  var C=cfg(),my=tk,log=[],rate=C.rate||.9;
  txt=String(txt).replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'');if(!txt){cb&&cb();return}
  function fin(){if(my!==tk)return;if(toast)toast.style.display='none';cb&&cb()}
- function fail(){if(my!==tk)return;note('Suara gagal ('+log.join(' · ')+'). Pasang suara Indonesia di sistem (Android: Pengaturan > Bahasa > Teks-ke-ucapan; Windows: Pengaturan > Waktu & bahasa > Ucapan > Tambah suara) atau coba Chrome / Edge.',9000);cb&&cb()}
+ function fail(){if(my!==tk)return;note('Suara gagal ('+log.join(' · ')+'). Pasang suara Indonesia di sistem (Android: Pengaturan > Bahasa > Teks-ke-ucapan; Windows: Pengaturan > Waktu & bahasa > Ucapan > Tambah suara) atau coba Chrome / Edge. Di TV: buka Pengaturan Suara > Uji jalur online.',9000);cb&&cb()}
  function online(si){
   if(my!==tk)return;if(C.tts==='dev')return fail();
-  var list=chunks(txt),i=si||0,e0=0;try{e0=+localStorage.getItem(EPK)||0}catch(e){}if(e0>=EP.length)e0=0;
+  var EPS=eps(),list=chunks(txt),i=si||0,e0=0,sv='';try{sv=localStorage.getItem(EPK)||''}catch(e){}
+  for(var q=0;q<EPS.length;q++)if(EPS[q].n===sv)e0=q;
   var tried=0,ep=e0;note('🔊 memuat suara online… (ketuk untuk berhenti)');
   function play(){
    if(my!==tk)return;if(i>=list.length)return fin();
-   var a=new Audio(EP[ep].u(list[i]));try{a.referrerPolicy='no-referrer'}catch(e){}
-   try{a.playbackRate=Math.min(1.5,Math.max(.6,rate/.9))}catch(e){}
-   au=a;var ok=false,dead=false;
+   var E=EPS[ep],a=null,ok=false,dead=false;
    var t=setTimeout(function(){if(!ok)bad('lambat')},7000);
-   function bad(why){if(dead||my!==tk||au!==a)return;dead=true;clearTimeout(t);try{a.pause()}catch(e){}
-    log.push(EP[ep].n+': '+(why||'gagal'));tried++;if(tried<EP.length){ep=(ep+1)%EP.length;play()}else fail()}
-   a.onplaying=function(){if(dead||my!==tk)return;ok=true;clearTimeout(t);try{localStorage.setItem(EPK,ep)}catch(e){}note('🔊 '+list[i].slice(0,60)+' · ketuk untuk berhenti')};
-   a.onended=function(){if(my!==tk)return;i++;tried=0;play()};
-   a.onerror=function(){bad('diblokir/gagal')};
-   var p;try{p=a.play()}catch(e){bad('error');return}if(p&&p.catch)p.catch(function(){bad('ditolak')})}
-  play()}
+   function bad(why){if(dead||my!==tk)return;dead=true;clearTimeout(t);if(a){try{a.pause()}catch(e){}}
+    log.push(E.n+': '+(why||'gagal'));tried++;if(tried<EPS.length){ep=(ep+1)%EPS.length;play()}else fail()}
+   function start(url){
+    if(dead||my!==tk)return;try{a=mkAudio(url)}catch(e){bad('error');return}
+    try{a.playbackRate=Math.min(1.5,Math.max(.6,rate/.9))}catch(e){}au=a;
+    a.onplaying=function(){if(dead||my!==tk)return;ok=true;clearTimeout(t);try{localStorage.setItem(EPK,E.n)}catch(e){}note('🔊 '+list[i].slice(0,60)+' · ketuk untuk berhenti')};
+    a.onended=function(){if(my!==tk)return;i++;tried=0;play()};
+    a.onerror=function(){bad('diblokir/gagal')};
+    var p;try{p=a.play()}catch(e){bad('error');return}if(p&&p.catch)p.catch(function(){bad('ditolak')})}
+   if(E.c)cloud(list[i],rate,function(u,y){if(u)start(u);else bad(y)});else start(E.u(list[i]))}
+  ready(play)}
  var v=(C.tts!=='net'&&syn)?pickVoice():null;
  if(v){
   var list=chunks(txt),i=0,started=false;
@@ -682,11 +711,11 @@ function off(manual){if(cfg().tts==='off'){if(manual)note('Suara sedang mati. Bu
 /* say: masuk antrean (untuk peringatan otomatis berurutan). speak: potong bacaan sebelumnya (untuk klik/ulang). */
 function say(t,o){if(!t||off(o&&o.manual))return;if(!interacted){pending.push(t);return}queue.push(t);pump()}
 function speak(t,o){if(!t||off(o&&o.manual))return;if(!interacted){pending=[t];return}stop();busy=true;var my=tk;run(t,function(){if(my===tk)busy=false;pump()},o&&o.manual)}
-function onUse(){if(interacted)return;interacted=true;
+function onUse(){if(interacted)return;interacted=true;prep();
  try{var ua=navigator.userAgent;if(syn&&/Safari/.test(ua)&&!/Chrome|Chromium|Android/.test(ua)){var u=new SpeechSynthesisUtterance('');u.volume=0;syn.speak(u)}}catch(e){}
  var q=pending.splice(0);for(var i=0;i<q.length;i++)say(q[i])}
 var evs=['click','touchstart','keydown','pointerdown'];for(var e=0;e<evs.length;e++)w.addEventListener(evs[e],onUse,true);
-function status(){var v=pickVoice(),C=cfg();return 'Perangkat: '+(syn?(v?v.name+' ('+v.lang+')':'tidak ada suara Indonesia'):'tidak didukung')+' · Online: Google TTS ('+EP.length+' jalur) · Mode: '+(MODES.filter(function(m){return m[0]===C.tts})[0]||[0,C.tts])[1]}
+function status(){var v=pickVoice(),C=cfg();return 'Anti-Referer: '+(frs===2?'aktif':frs===3?'tidak tersedia (cadangan)':'menyiapkan')+' · '+'Perangkat: '+(syn?(v?v.name+' ('+v.lang+')':'tidak ada suara Indonesia'):'tidak didukung')+' · Online: Google TTS ('+EP.length+' jalur) · Mode: '+(MODES.filter(function(m){return m[0]===C.tts})[0]||[0,C.tts])[1]}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function panel(){
  var ex=d.getElementById('mv-ov');if(ex){ex.parentNode.removeChild(ex);return}
@@ -696,18 +725,20 @@ function panel(){
  for(i=0;i<RATES.length;i++)h+='<label><input type="radio" name="mvr" value="'+RATES[i][0]+'"'+(C.rate===RATES[i][0]?' checked':'')+'>'+RATES[i][1]+'</label>';
  h+='</div><h4>Suara perangkat</h4><select id="mvv"><option value="">Otomatis (bahasa Indonesia)</option>';
  for(i=0;i<vs.length;i++)h+='<option value="'+esc(vs[i].name)+'"'+(C.vname===vs[i].name?' selected':'')+'>'+esc(vs[i].name)+' ('+esc(vs[i].lang)+')</option>';
- h+='</select><p id="mvs"></p><button id="mvt">▶ Tes suara</button><button id="mvx" class="sec">■ Hentikan</button><button id="mvc" class="sec">Tutup</button>'+
+ h+='</select><h4>Google Cloud TTS (opsional, paling andal di TV)</h4><input id="mvk" type="password" autocomplete="off" placeholder="'+(C.gkey?'Kunci tersimpan (kosongkan untuk hapus)':'API key Text-to-Speech')+'" style="width:100%;padding:9px;border-radius:10px;border:1.5px solid #cfe0da;font:inherit"><p id="mvs"></p><button id="mvt">▶ Tes suara</button><button id="mvp" class="sec">🔎 Uji jalur online</button><button id="mvx" class="sec">■ Hentikan</button><button id="mvc" class="sec">Tutup</button>'+
   '<p>Mode otomatis memakai suara perangkat lebih dulu; bila tidak ada atau gagal, beralih ke suara online (perlu internet). Pada TV/peramban tanpa suara Indonesia, pilih “Hanya suara online”.</p></div>';
  var ov=d.createElement('div');ov.id='mv-ov';ov.innerHTML=h;(d.body||d.documentElement).appendChild(ov);
  var q=function(s){return ov.querySelector(s)},closeP=function(){if(ov.parentNode)ov.parentNode.removeChild(ov);d.removeEventListener('keydown',esck,true)};
  function esck(ev){if(ev.key==='Escape'||ev.keyCode===27)closeP()}d.addEventListener('keydown',esck,true);
  q('#mvs').textContent=status();
  ov.onclick=function(ev){if(ev.target===ov)closeP()};
- ov.onchange=function(ev){var t=ev.target;if(t.name==='mvm'){stop();save({tts:t.value})}else if(t.name==='mvr')save({rate:parseFloat(t.value)});else if(t.id==='mvv')save({vname:t.value});q('#mvs').textContent=status()};
+ ov.onchange=function(ev){var t=ev.target;if(t.name==='mvm'){stop();save({tts:t.value})}else if(t.name==='mvr')save({rate:parseFloat(t.value)});else if(t.id==='mvv')save({vname:t.value});else if(t.id==='mvk')save({gkey:t.value.replace(/\s/g,'')});q('#mvs').textContent=status()};
  q('#mvt').onclick=function(){speak('Tes suara. Peringatan kualitas udara dan titik panas siap dibacakan.',{manual:true})};
+ q('#mvp').onclick=function(){q('#mvs').textContent='Menguji jalur online…';probe(function(r){q('#mvs').textContent='Uji online → '+r+' · '+status()})};
  q('#mvx').onclick=stop;q('#mvc').onclick=closeP;
  try{(q('input[name=mvm]:checked')||q('#mvc')).focus()}catch(e){}}
-w.MSALVoice={say:say,speak:speak,stop:stop,panel:panel,cfg:cfg,status:status,onChange:function(f){subs.push(f)},icon:function(){return cfg().tts==='off'?'🔇':'🔊'},_chunks:chunks};
+if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',prep);else prep();
+w.MSALVoice={probe:probe,say:say,speak:speak,stop:stop,panel:panel,cfg:cfg,status:status,onChange:function(f){subs.push(f)},icon:function(){return cfg().tts==='off'?'🔇':'🔊'},_chunks:chunks};
 })(window);
 </script>
 </head>
